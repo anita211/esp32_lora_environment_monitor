@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - LoRa Monitoring</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .presence-detected { font-weight: bold; color: #eab308; }
+        .alert-presence { border-left: 4px solid #eab308; }
+        .alert-low_battery { border-left: 4px solid #ef4444; }
+        .alert-high_humidity { border-left: 4px solid #3b82f6; }
+        .stat-card { transition: transform 0.2s; }
+        .stat-card:hover { transform: translateY(-2px); }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100">
+
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+        <header class="mb-6 text-center">
+            <h1 class="text-3xl sm:text-4xl font-bold text-cyan-400">LoRa Monitoring Dashboard</h1>
+            <p class="text-gray-400 mt-2">Environmental sensor network monitoring</p>
+        </header>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-6">
+            <div class="stat-card bg-gray-800 rounded-lg p-4 text-center">
+                <div class="text-2xl font-bold text-green-400" id="stat-rx-valid">0</div>
+                <div class="text-xs text-gray-400">Valid Packets</div>
+            </div>
+            <div class="stat-card bg-gray-800 rounded-lg p-4 text-center">
+                <div class="text-2xl font-bold text-red-400" id="stat-rx-invalid">0</div>
+                <div class="text-xs text-gray-400">Invalid Packets</div>
+            </div>
+            <div class="stat-card bg-gray-800 rounded-lg p-4 text-center">
+                <div class="text-2xl font-bold text-yellow-400" id="stat-packet-loss">0%</div>
+                <div class="text-xs text-gray-400">Packet Loss</div>
+            </div>
+            <div class="stat-card bg-gray-800 rounded-lg p-4 text-center">
+                <div class="text-2xl font-bold text-blue-400" id="stat-latency">0 ms</div>
+                <div class="text-xs text-gray-400">Avg Latency</div>
+            </div>
+            <div class="stat-card bg-gray-800 rounded-lg p-4 text-center">
+                <div class="text-2xl font-bold text-purple-400" id="stat-energy">0 mAh</div>
+                <div class="text-xs text-gray-400">Energy Used</div>
+            </div>
+            <div class="stat-card bg-gray-800 rounded-lg p-4 text-center">
+                <div class="text-2xl font-bold text-cyan-400" id="stat-uptime">0:00:00</div>
+                <div class="text-xs text-gray-400">Uptime</div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+            <div class="bg-gray-800 rounded-xl p-4">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-semibold text-yellow-400">Alerts</h2>
+                    <span class="text-xs bg-yellow-600 px-2 py-1 rounded" id="alert-count">0</span>
+                </div>
+                <div id="alerts-container" class="space-y-2 max-h-64 overflow-y-auto">
+                    <p class="text-gray-500 text-sm text-center py-4">No alerts</p>
+                </div>
+            </div>
+            
+            <div class="bg-gray-800 rounded-xl p-4">
+                <h2 class="text-lg font-semibold text-cyan-400 mb-4">Gateway Statistics</h2>
+                <div id="gateway-details" class="grid grid-cols-2 gap-3 text-sm">
+                    <div class="text-gray-400">Latency (min/avg/max):</div>
+                    <div id="latency-detail" class="text-white">- / - / - ms</div>
+                    <div class="text-gray-400">Server Success Rate:</div>
+                    <div id="server-rate" class="text-white">-</div>
+                    <div class="text-gray-400">WiFi RSSI:</div>
+                    <div id="wifi-rssi" class="text-white">- dBm</div>
+                    <div class="text-gray-400">Checksum Errors:</div>
+                    <div id="checksum-errors" class="text-white">-</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-gray-800 shadow-lg rounded-xl overflow-hidden">
+            <div class="p-4 border-b border-gray-700">
+                <h2 class="text-lg font-semibold text-cyan-400">Live Sensor Data</h2>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead class="bg-gray-700">
+                        <tr>
+                            <th class="p-4 font-semibold">Node ID</th>
+                            <th class="p-4 font-semibold">Timestamp</th>
+                            <th class="p-4 font-semibold text-center">Humidity</th>
+                            <th class="p-4 font-semibold text-center">Distance</th>
+                            <th class="p-4 font-semibold text-center">Presence</th>
+                            <th class="p-4 font-semibold text-center">Battery</th>
+                            <th class="p-4 font-semibold text-center">RSSI</th>
+                        </tr>
+                    </thead>
+                    <tbody id="data-table-body" class="divide-y divide-gray-700">
+                        <tr><td colspan="7" class="text-center p-8 text-gray-500">Waiting for data...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <footer class="p-4 text-center text-sm text-gray-500 bg-gray-900">
+                Refreshing every 5 seconds. Last update: <span id="last-update">Never</span>
+            </footer>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = '/data';
+        const REFRESH_INTERVAL = 5000;
+
+        async function fetchData() {
+            try {
+                const response = await fetch(API_URL);
+                if (!response.ok) throw new Error(`Server response error: ${response.status}`);
+                const data = await response.json();
+                updateTable(data);
+            } catch (error) {
+                console.error('Failed to fetch data:', error);
+                const tableBody = document.getElementById('data-table-body');
+                tableBody.innerHTML = `<tr><td colspan="7" class="text-center p-8 text-red-400">Failed to load data. Make sure the server is running.</td></tr>`;
+            } finally {
+                document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
+            }
+        }
+
+        async function fetchGatewayStats() {
+            try {
+                const response = await fetch('/api/gateway-stats');
+                if (!response.ok) return;
+                const data = await response.json();
+                if (data && data.length > 0) {
+                    updateStatsCards(data[0]);
+                }
+            } catch (error) {
+                console.error('Failed to fetch gateway stats:', error);
+            }
+        }
+
+        async function fetchAlerts() {
+            try {
+                const response = await fetch('/api/alerts');
+                if (!response.ok) return;
+                const alerts = await response.json();
+                updateAlerts(alerts);
+            } catch (error) {
+                console.error('Failed to fetch alerts:', error);
+            }
+        }
+
+
+
+        function updateStatsCards(stats) {
+            if (!stats) return;
+            
+            const lora = stats.lora_stats || {};
+            const latency = stats.latency || {};
+            const server = stats.server_stats || {};
+            
+            document.getElementById('stat-rx-valid').textContent = lora.rx_valid || 0;
+            document.getElementById('stat-rx-invalid').textContent = lora.rx_invalid || 0;
+            document.getElementById('stat-packet-loss').textContent = (lora.packet_loss_percent || 0).toFixed(1) + '%';
+            document.getElementById('stat-latency').textContent = (latency.avg_ms || 0).toFixed(0) + ' ms';
+            document.getElementById('stat-energy').textContent = (stats.energy_mah || 0).toFixed(1) + ' mAh';
+            
+            const uptime = stats.uptime_seconds || 0;
+            const hours = Math.floor(uptime / 3600);
+            const minutes = Math.floor((uptime % 3600) / 60);
+            const seconds = uptime % 60;
+            document.getElementById('stat-uptime').textContent = 
+                `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            
+            document.getElementById('latency-detail').textContent = 
+                `${latency.min_ms || 0} / ${(latency.avg_ms || 0).toFixed(0)} / ${latency.max_ms || 0} ms`;
+            document.getElementById('server-rate').textContent = 
+                `${(server.success_rate_percent || 0).toFixed(1)}% (${server.tx_success || 0}/${server.tx_total || 0})`;
+            document.getElementById('wifi-rssi').textContent = 
+                `${stats.wifi_rssi || '-'} dBm`;
+            document.getElementById('checksum-errors').textContent = 
+                lora.rx_checksum_error || 0;
+        }
+
+        function updateAlerts(alerts) {
+            const container = document.getElementById('alerts-container');
+            const countBadge = document.getElementById('alert-count');
+            
+            const unacknowledged = alerts.filter(a => !a.acknowledged);
+            countBadge.textContent = unacknowledged.length;
+            
+            if (alerts.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">No alerts</p>';
+                return;
+            }
+            
+            container.innerHTML = alerts.slice(0, 10).map(alert => `
+                <div class="bg-gray-700 rounded p-3 alert-${alert.alert_type} ${alert.acknowledged ? 'opacity-50' : ''}">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <span class="text-xs font-semibold uppercase ${getAlertColor(alert.alert_type)}">${formatAlertType(alert.alert_type)}</span>
+                            <p class="text-sm text-gray-300 mt-1">${alert.message}</p>
+                        </div>
+                        ${!alert.acknowledged ? `<button onclick="acknowledgeAlert(${alert.id})" class="text-xs text-gray-400 hover:text-white">✕</button>` : ''}
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">${new Date(alert.timestamp).toLocaleString()}</p>
+                </div>
+            `).join('');
+        }
+
+        function getAlertColor(type) {
+            switch (type) {
+                case 'presence': return 'text-yellow-400';
+                case 'low_battery': return 'text-red-400';
+                case 'high_humidity': return 'text-blue-400';
+                default: return 'text-gray-400';
+            }
+        }
+
+        function formatAlertType(type) {
+            switch (type) {
+                case 'presence': return '👁 Presence';
+                case 'low_battery': return '🔋 Low Battery';
+                case 'high_humidity': return '💧 High Humidity';
+                default: return type;
+            }
+        }
+
+        async function acknowledgeAlert(id) {
+            try {
+                await fetch('/api/alerts/acknowledge', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id })
+                });
+                fetchAlerts();
+            } catch (error) {
+                console.error('Failed to acknowledge alert:', error);
+            }
+        }
+
+
+
+        function updateTable(data) {
+            const tableBody = document.getElementById('data-table-body');
+            if (!data || data.length === 0) {
+                tableBody.innerHTML = `<tr><td colspan="7" class="text-center p-8 text-gray-500">No data received yet...</td></tr>`;
+                return;
+            }
+            
+            tableBody.innerHTML = '';
+            
+            data.forEach(item => {
+                const sensors = item.sensors;
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-700 transition-colors duration-200';
+
+                const presenceClass = sensors.presence_detected ? 'presence-detected' : '';
+                const distanceClass = sensors.distance_cm < 100 ? 'text-yellow-400' : 'text-gray-300';
+                const batteryClass = item.battery_percent < 20 ? 'text-red-400' : (item.battery_percent < 50 ? 'text-yellow-400' : 'text-green-400');
+
+                row.innerHTML = `
+                    <td class="p-4 font-mono">${item.node_id}</td>
+                    <td class="p-4">${new Date(item.timestamp).toLocaleString()}</td>
+                    <td class="p-4 text-center">${sensors.humidity_percent?.toFixed(1) ?? 'N/A'} %</td>
+                    <td class="p-4 text-center ${distanceClass}">${sensors.distance_cm ?? 'N/A'} cm</td>
+                    <td class="p-4 text-center font-bold ${presenceClass}">${sensors.presence_detected ? '✓ DETECTED' : 'No'}</td>
+                    <td class="p-4 text-center ${batteryClass}">${item.battery_percent ?? 'N/A'} %</td>
+                    <td class="p-4 text-center text-sm">${sensors.rssi_dbm?.toFixed(1) ?? 'N/A'} dBm</td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchData();
+            fetchGatewayStats();
+            fetchAlerts();
+            
+            setInterval(fetchData, REFRESH_INTERVAL);
+            setInterval(fetchGatewayStats, 10000);
+            setInterval(fetchAlerts, 15000);
+        });
+    </script>
+
+</body>
+</html>
