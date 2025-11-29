@@ -54,7 +54,7 @@ void loop()
     bool presence = distance < PRESENCE_THRESHOLD_CM;
 
     DEBUG_PRINTF("[SENSOR] H=%.1f%%, D=%.0fcm, P=%s\n", 
-                humidity, distnace, presence ? "YES" : "No");
+                humidity, distance, presence ? "YES" : "No");
 
     bool should_send = true;
 
