@@ -1,285 +1,217 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - LoRa Monitoring</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-        body { font-family: 'Inter', sans-serif; }
-        .presence-detected { font-weight: bold; color: #eab308; }
-        .alert-presence { border-left: 4px solid #eab308; }
-        .alert-low_battery { border-left: 4px solid #ef4444; }
-        .alert-high_humidity { border-left: 4px solid #3b82f6; }
-        .stat-card { transition: transform 0.2s; }
-        .stat-card:hover { transform: translateY(-2px); }
-    </style>
-</head>
-<body class="bg-gray-900 text-gray-100">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ESP32 LoRa Monitor</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <header>
+        <h1>🌿 ESP32 LoRa Environment Monitor</h1>
+        <p>Real-time environmental monitoring via LoRa</p>
+      </header>
 
-    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
-        <header class="mb-6 text-center">
-            <h1 class="text-3xl sm:text-4xl font-bold text-cyan-400">LoRa Monitoring Dashboard</h1>
-            <p class="text-gray-400 mt-2">Environmental sensor network monitoring</p>
-        </header>
-
-        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-6">
-            <div class="stat-card bg-gray-800 rounded-lg p-4 text-center">
-                <div class="text-2xl font-bold text-green-400" id="stat-rx-valid">0</div>
-                <div class="text-xs text-gray-400">Valid Packets</div>
-            </div>
-            <div class="stat-card bg-gray-800 rounded-lg p-4 text-center">
-                <div class="text-2xl font-bold text-red-400" id="stat-rx-invalid">0</div>
-                <div class="text-xs text-gray-400">Invalid Packets</div>
-            </div>
-            <div class="stat-card bg-gray-800 rounded-lg p-4 text-center">
-                <div class="text-2xl font-bold text-yellow-400" id="stat-packet-loss">0%</div>
-                <div class="text-xs text-gray-400">Packet Loss</div>
-            </div>
-            <div class="stat-card bg-gray-800 rounded-lg p-4 text-center">
-                <div class="text-2xl font-bold text-blue-400" id="stat-latency">0 ms</div>
-                <div class="text-xs text-gray-400">Avg Latency</div>
-            </div>
-            <div class="stat-card bg-gray-800 rounded-lg p-4 text-center">
-                <div class="text-2xl font-bold text-purple-400" id="stat-energy">0 mAh</div>
-                <div class="text-xs text-gray-400">Energy Used</div>
-            </div>
-            <div class="stat-card bg-gray-800 rounded-lg p-4 text-center">
-                <div class="text-2xl font-bold text-cyan-400" id="stat-uptime">0:00:00</div>
-                <div class="text-xs text-gray-400">Uptime</div>
-            </div>
+      <div class="stats-row">
+        <div class="stat-card">
+          <span class="stat-label">Active Nodes</span>
+          <span class="stat-value" id="active-nodes">0</span>
         </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-            <div class="bg-gray-800 rounded-xl p-4">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-lg font-semibold text-yellow-400">Alerts</h2>
-                    <span class="text-xs bg-yellow-600 px-2 py-1 rounded" id="alert-count">0</span>
-                </div>
-                <div id="alerts-container" class="space-y-2 max-h-64 overflow-y-auto">
-                    <p class="text-gray-500 text-sm text-center py-4">No alerts</p>
-                </div>
-            </div>
-            
-            <div class="bg-gray-800 rounded-xl p-4">
-                <h2 class="text-lg font-semibold text-cyan-400 mb-4">Gateway Statistics</h2>
-                <div id="gateway-details" class="grid grid-cols-2 gap-3 text-sm">
-                    <div class="text-gray-400">Latency (min/avg/max):</div>
-                    <div id="latency-detail" class="text-white">- / - / - ms</div>
-                    <div class="text-gray-400">Server Success Rate:</div>
-                    <div id="server-rate" class="text-white">-</div>
-                    <div class="text-gray-400">WiFi RSSI:</div>
-                    <div id="wifi-rssi" class="text-white">- dBm</div>
-                    <div class="text-gray-400">Checksum Errors:</div>
-                    <div id="checksum-errors" class="text-white">-</div>
-                </div>
-            </div>
+        <div class="stat-card">
+          <span class="stat-label">Last Update</span>
+          <span class="stat-value" id="last-update">--:--:--</span>
         </div>
-
-        <div class="bg-gray-800 shadow-lg rounded-xl overflow-hidden">
-            <div class="p-4 border-b border-gray-700">
-                <h2 class="text-lg font-semibold text-cyan-400">Live Sensor Data</h2>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="w-full text-left">
-                    <thead class="bg-gray-700">
-                        <tr>
-                            <th class="p-4 font-semibold">Node ID</th>
-                            <th class="p-4 font-semibold">Timestamp</th>
-                            <th class="p-4 font-semibold text-center">Humidity</th>
-                            <th class="p-4 font-semibold text-center">Distance</th>
-                            <th class="p-4 font-semibold text-center">Presence</th>
-                            <th class="p-4 font-semibold text-center">Battery</th>
-                            <th class="p-4 font-semibold text-center">RSSI</th>
-                        </tr>
-                    </thead>
-                    <tbody id="data-table-body" class="divide-y divide-gray-700">
-                        <tr><td colspan="7" class="text-center p-8 text-gray-500">Waiting for data...</td></tr>
-                    </tbody>
-                </table>
-            </div>
-            <footer class="p-4 text-center text-sm text-gray-500 bg-gray-900">
-                Refreshing every 5 seconds. Last update: <span id="last-update">Never</span>
-            </footer>
+        <div class="stat-card">
+          <span class="stat-label">Status</span>
+          <span class="stat-value status-dot" id="connection-status">● Connecting...</span>
         </div>
+      </div>
+
+      <div class="card">
+        <h2>📡 Sensor Data</h2>
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th>Node (ID)</th>
+                <th>Timestamp</th>
+                <th class="center">💧 Soil Moisture</th>
+                <th class="center">📏 Distance</th>
+                <th class="center">🔋 Battery</th>
+                <th class="center">📶 RSSI</th>
+                <th class="center">📊 SNR</th>
+              </tr>
+            </thead>
+            <tbody id="table-body">
+              <tr>
+                <td colspan="7" class="center mono">Waiting for sensor data...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>⚠️ Recent Alerts</h2>
+        <div id="alerts-container">
+          <p class="mono center">No alerts</p>
+        </div>
+      </div>
     </div>
 
     <script>
-        const API_URL = '/data';
-        const REFRESH_INTERVAL = 5000;
+      const DATA_ENDPOINT = "/data";
+      const ALERTS_ENDPOINT = "/api/alerts";
+      const POLL_INTERVAL = 5000;
 
-        async function fetchData() {
-            try {
-                const response = await fetch(API_URL);
-                if (!response.ok) throw new Error(`Server response error: ${response.status}`);
-                const data = await response.json();
-                updateTable(data);
-            } catch (error) {
-                console.error('Failed to fetch data:', error);
-                const tableBody = document.getElementById('data-table-body');
-                tableBody.innerHTML = `<tr><td colspan="7" class="text-center p-8 text-red-400">Failed to load data. Make sure the server is running.</td></tr>`;
-            } finally {
-                document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
-            }
+      // Classificação de umidade do solo
+      function classifyMoisture(value) {
+        if (value == null || Number.isNaN(value)) return "";
+        if (value < 20) return "moisture-dry";
+        if (value < 40) return "moisture-low";
+        if (value > 80) return "moisture-wet";
+        return "moisture-ok";
+      }
+
+      // Classificação de bateria
+      function classifyBattery(value) {
+        if (value == null || Number.isNaN(value)) return "";
+        if (value < 20) return "battery-critical";
+        if (value < 40) return "battery-low";
+        return "battery-ok";
+      }
+
+      // Classificação de sinal RSSI
+      function classifyRSSI(value) {
+        if (value == null || Number.isNaN(value)) return "";
+        if (value < -100) return "signal-weak";
+        if (value < -80) return "signal-fair";
+        return "signal-good";
+      }
+
+      async function fetchAndRender() {
+        const statusEl = document.getElementById("connection-status");
+        try {
+          const res = await fetch(DATA_ENDPOINT);
+          if (!res.ok) throw new Error(`status ${res.status}`);
+          const payload = await res.json();
+          renderTable(payload);
+          statusEl.textContent = "● Online";
+          statusEl.className = "stat-value status-dot status-online";
+        } catch (err) {
+          const el = document.getElementById("table-body");
+          el.innerHTML = `<tr><td colspan="7" class="center mono">Failed to load data. Is the server running?</td></tr>`;
+          statusEl.textContent = "● Offline";
+          statusEl.className = "stat-value status-dot status-offline";
+          console.error("Fetch error:", err);
+        } finally {
+          document.getElementById("last-update").textContent =
+            new Date().toLocaleTimeString("en-US");
+        }
+      }
+
+      async function fetchAlerts() {
+        try {
+          const res = await fetch(ALERTS_ENDPOINT);
+          if (!res.ok) return;
+          const alerts = await res.json();
+          renderAlerts(alerts);
+        } catch (err) {
+          console.error("Alerts fetch error:", err);
+        }
+      }
+
+      function renderTable(list) {
+        const body = document.getElementById("table-body");
+        const activeNodesEl = document.getElementById("active-nodes");
+
+        if (!Array.isArray(list) || list.length === 0) {
+          body.innerHTML = `<tr><td colspan="7" class="center mono">No data received yet...</td></tr>`;
+          activeNodesEl.textContent = "0";
+          return;
         }
 
-        async function fetchGatewayStats() {
-            try {
-                const response = await fetch('/api/gateway-stats');
-                if (!response.ok) return;
-                const data = await response.json();
-                if (data && data.length > 0) {
-                    updateStatsCards(data[0]);
-                }
-            } catch (error) {
-                console.error('Failed to fetch gateway stats:', error);
-            }
-        }
+        activeNodesEl.textContent = list.length;
+        body.innerHTML = "";
 
-        async function fetchAlerts() {
-            try {
-                const response = await fetch('/api/alerts');
-                if (!response.ok) return;
-                const alerts = await response.json();
-                updateAlerts(alerts);
-            } catch (error) {
-                console.error('Failed to fetch alerts:', error);
-            }
-        }
+        list.forEach((entry) => {
+          const node = entry.node_id ?? "N/A";
+          const ts = entry.timestamp
+            ? new Date(entry.timestamp).toLocaleString("en-US")
+            : "N/A";
+          const s = entry.sensors || entry;
+          const radio = entry.radio || {};
 
+          // Umidade do solo
+          const moistureVal = s.humidity_percent ?? s.humidity;
+          const moistureDisplay = typeof moistureVal === "number"
+            ? moistureVal.toFixed(1) + " %"
+            : "N/A";
+          const moistureClass = classifyMoisture(moistureVal);
 
+          // Distância (ultrassônico)
+          const distVal = s.distance_cm;
+          const distDisplay = typeof distVal === "number"
+            ? distVal + " cm"
+            : "N/A";
 
-        function updateStatsCards(stats) {
-            if (!stats) return;
-            
-            const lora = stats.lora_stats || {};
-            const latency = stats.latency || {};
-            const server = stats.server_stats || {};
-            
-            document.getElementById('stat-rx-valid').textContent = lora.rx_valid || 0;
-            document.getElementById('stat-rx-invalid').textContent = lora.rx_invalid || 0;
-            document.getElementById('stat-packet-loss').textContent = (lora.packet_loss_percent || 0).toFixed(1) + '%';
-            document.getElementById('stat-latency').textContent = (latency.avg_ms || 0).toFixed(0) + ' ms';
-            document.getElementById('stat-energy').textContent = (stats.energy_mah || 0).toFixed(1) + ' mAh';
-            
-            const uptime = stats.uptime_seconds || 0;
-            const hours = Math.floor(uptime / 3600);
-            const minutes = Math.floor((uptime % 3600) / 60);
-            const seconds = uptime % 60;
-            document.getElementById('stat-uptime').textContent = 
-                `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-            
-            document.getElementById('latency-detail').textContent = 
-                `${latency.min_ms || 0} / ${(latency.avg_ms || 0).toFixed(0)} / ${latency.max_ms || 0} ms`;
-            document.getElementById('server-rate').textContent = 
-                `${(server.success_rate_percent || 0).toFixed(1)}% (${server.tx_success || 0}/${server.tx_total || 0})`;
-            document.getElementById('wifi-rssi').textContent = 
-                `${stats.wifi_rssi || '-'} dBm`;
-            document.getElementById('checksum-errors').textContent = 
-                lora.rx_checksum_error || 0;
-        }
+          // Bateria
+          const battVal = entry.battery_percent ?? s.battery;
+          const battDisplay = typeof battVal === "number"
+            ? battVal + " %"
+            : "N/A";
+          const battClass = classifyBattery(battVal);
 
-        function updateAlerts(alerts) {
-            const container = document.getElementById('alerts-container');
-            const countBadge = document.getElementById('alert-count');
-            
-            const unacknowledged = alerts.filter(a => !a.acknowledged);
-            countBadge.textContent = unacknowledged.length;
-            
-            if (alerts.length === 0) {
-                container.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">No alerts</p>';
-                return;
-            }
-            
-            container.innerHTML = alerts.slice(0, 10).map(alert => `
-                <div class="bg-gray-700 rounded p-3 alert-${alert.alert_type} ${alert.acknowledged ? 'opacity-50' : ''}">
-                    <div class="flex justify-between items-start">
-                        <div>
-                            <span class="text-xs font-semibold uppercase ${getAlertColor(alert.alert_type)}">${formatAlertType(alert.alert_type)}</span>
-                            <p class="text-sm text-gray-300 mt-1">${alert.message}</p>
-                        </div>
-                        ${!alert.acknowledged ? `<button onclick="acknowledgeAlert(${alert.id})" class="text-xs text-gray-400 hover:text-white">✕</button>` : ''}
-                    </div>
-                    <p class="text-xs text-gray-500 mt-1">${new Date(alert.timestamp).toLocaleString()}</p>
-                </div>
-            `).join('');
-        }
+          // RSSI
+          const rssiVal = radio.rssi_dbm ?? s.rssi_dbm;
+          const rssiDisplay = typeof rssiVal === "number"
+            ? rssiVal + " dBm"
+            : "N/A";
+          const rssiClass = classifyRSSI(rssiVal);
 
-        function getAlertColor(type) {
-            switch (type) {
-                case 'presence': return 'text-yellow-400';
-                case 'low_battery': return 'text-red-400';
-                case 'high_humidity': return 'text-blue-400';
-                default: return 'text-gray-400';
-            }
-        }
+          // SNR
+          const snrVal = radio.snr_db ?? s.snr_db;
+          const snrDisplay = typeof snrVal === "number"
+            ? snrVal.toFixed(1) + " dB"
+            : "N/A";
 
-        function formatAlertType(type) {
-            switch (type) {
-                case 'presence': return '👁 Presence';
-                case 'low_battery': return '🔋 Low Battery';
-                case 'high_humidity': return '💧 High Humidity';
-                default: return type;
-            }
-        }
-
-        async function acknowledgeAlert(id) {
-            try {
-                await fetch('/api/alerts/acknowledge', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id })
-                });
-                fetchAlerts();
-            } catch (error) {
-                console.error('Failed to acknowledge alert:', error);
-            }
-        }
-
-
-
-        function updateTable(data) {
-            const tableBody = document.getElementById('data-table-body');
-            if (!data || data.length === 0) {
-                tableBody.innerHTML = `<tr><td colspan="7" class="text-center p-8 text-gray-500">No data received yet...</td></tr>`;
-                return;
-            }
-            
-            tableBody.innerHTML = '';
-            
-            data.forEach(item => {
-                const sensors = item.sensors;
-                const row = document.createElement('tr');
-                row.className = 'hover:bg-gray-700 transition-colors duration-200';
-
-                const presenceClass = sensors.presence_detected ? 'presence-detected' : '';
-                const distanceClass = sensors.distance_cm < 100 ? 'text-yellow-400' : 'text-gray-300';
-                const batteryClass = item.battery_percent < 20 ? 'text-red-400' : (item.battery_percent < 50 ? 'text-yellow-400' : 'text-green-400');
-
-                row.innerHTML = `
-                    <td class="p-4 font-mono">${item.node_id}</td>
-                    <td class="p-4">${new Date(item.timestamp).toLocaleString()}</td>
-                    <td class="p-4 text-center">${sensors.humidity_percent?.toFixed(1) ?? 'N/A'} %</td>
-                    <td class="p-4 text-center ${distanceClass}">${sensors.distance_cm ?? 'N/A'} cm</td>
-                    <td class="p-4 text-center font-bold ${presenceClass}">${sensors.presence_detected ? '✓ DETECTED' : 'No'}</td>
-                    <td class="p-4 text-center ${batteryClass}">${item.battery_percent ?? 'N/A'} %</td>
-                    <td class="p-4 text-center text-sm">${sensors.rssi_dbm?.toFixed(1) ?? 'N/A'} dBm</td>
-                `;
-                tableBody.appendChild(row);
-            });
-        }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            fetchData();
-            fetchGatewayStats();
-            fetchAlerts();
-            
-            setInterval(fetchData, REFRESH_INTERVAL);
-            setInterval(fetchGatewayStats, 10000);
-            setInterval(fetchAlerts, 15000);
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td class="mono node-id">${node}</td>
+            <td>${ts}</td>
+            <td class="center ${moistureClass}">${moistureDisplay}</td>
+            <td class="center">${distDisplay}</td>
+            <td class="center ${battClass}">${battDisplay}</td>
+            <td class="center ${rssiClass}">${rssiDisplay}</td>
+            <td class="center">${snrDisplay}</td>
+          `;
+          body.appendChild(tr);
         });
-    </script>
+      }
 
-</body>
+      function renderAlerts(alerts) {
+        const container = document.getElementById("alerts-container");
+        if (!Array.isArray(alerts) || alerts.length === 0) {
+          container.innerHTML = `<p class="mono center">No alerts</p>`;
+          return;
+        }
+
+        container.innerHTML = alerts.slice(0, 5).map(alert => `
+          <div class="alert-item ${alert.acknowledged ? 'alert-ack' : ''}">
+            <span class="alert-time">${new Date(alert.timestamp).toLocaleString("en-US")}</span>
+            <span class="alert-node">Node ${alert.node_id || '?'}</span>
+            <span class="alert-msg">${alert.message}</span>
+          </div>
+        `).join('');
+      }
+
+      document.addEventListener("DOMContentLoaded", () => {
+        fetchAndRender();
+        fetchAlerts();
+        setInterval(fetchAndRender, POLL_INTERVAL);
+        setInterval(fetchAlerts, POLL_INTERVAL * 2);
+      });
+    </script>
+  </body>
 </html>
