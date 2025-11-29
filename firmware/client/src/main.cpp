@@ -1,244 +1,380 @@
-#include "config.h"
-#include "protocol.h"
+/**
+ * @file main.cpp
+ * @brief ESP32 LoRa Environment Monitor - Sensor Node (Client)
+ * 
+ * This firmware reads environmental sensors (soil moisture, ultrasonic distance)
+ * and transmits data via LoRa to a gateway node.
+ * 
+ * Hardware:
+ *   - Seeed XIAO ESP32-S3
+ *   - SX1262 LoRa module
+ *   - MH-RD soil moisture sensor
+ *   - HC-SR04 ultrasonic distance sensor
+ */
+
 #include <Arduino.h>
 #include <RadioLib.h>
 #include <math.h>
+#include "config.h"
+#include "protocol.h"
 
-SX1262 radio = new Module(LORA_NSS, LORA_DIO1, LORA_RST, LORA_BUSY);
+/* ============================================================================
+ * GLOBAL STATE
+ * ============================================================================ */
 
-float prev_humidity = 0.0f;
-float prev_distance = 0.0f;
+// LoRa radio instance
+static SX1262 g_radio = new Module(PIN_LORA_NSS, PIN_LORA_DIO1, PIN_LORA_RST, PIN_LORA_BUSY);
 
-uint32_t tx_count = 0;
-uint32_t tx_success = 0;
-uint32_t tx_failed = 0;
-uint32_t tx_skipped = 0;
+// Previous sensor readings (for adaptive transmission)
+static float g_prev_humidity = 0.0f;
+static float g_prev_distance = 0.0f;
 
-bool lora_initialized = false;
+// Transmission statistics
+static struct {
+    uint32_t total;
+    uint32_t success;
+    uint32_t failed;
+    uint32_t skipped;
+} g_tx_stats = {0, 0, 0, 0};
 
-RTC_DATA_ATTR uint32_t boot_count = 0;
+// Hardware state
+static bool g_lora_ready = false;
 
-void setup_lora();
-void setup_sensors();
-float read_moisture_sensor();
-float read_ultrasonic_distance();
-void read_sensors(float& humid, float& distance);
-bool should_transmit(float humid, float distance);
-bool transmit_sensor_data(float humid, float distance);
-void enter_deep_sleep();
-void print_stats();
-float simulate_sensor_reading(float base, float variation);
+// Persisted across deep sleep (stored in RTC memory)
+RTC_DATA_ATTR static uint32_t g_boot_count = 0;
+
+/* ============================================================================
+ * FUNCTION DECLARATIONS
+ * ============================================================================ */
+
+// Initialization
+static void init_lora_radio();
+static void init_sensors();
+
+// Sensor reading
+static float read_soil_moisture();
+static float read_ultrasonic_distance();
+static void  read_all_sensors(float& out_humidity, float& out_distance);
+
+// Transmission logic
+static bool should_transmit(float humidity, float distance);
+static bool transmit_sensor_data(float humidity, float distance);
+
+// Power management
+static void enter_deep_sleep();
+
+// Utilities
+static void print_statistics();
+static float generate_simulated_value(float base_value, float variation);
+
+/* ============================================================================
+ * SETUP
+ * ============================================================================ */
 
 void setup()
 {
-    boot_count++;
+    g_boot_count++;
 
-#if DEBUG_MODE
-    Serial.begin(SERIAL_BAUD);
+#if DEBUG_ENABLED
+    Serial.begin(SERIAL_BAUD_RATE);
     delay(500);
-    DEBUG_PRINTF("\n[CLIENT] Boot #%u, ID: %d\n", boot_count, CLIENT_ID);
+    LOG_F("\n========================================\n");
+    LOG_F("[NODE %d] Boot #%u\n", NODE_ID, g_boot_count);
+    LOG_F("========================================\n");
 #endif
 
-    setup_lora();
-    setup_sensors();
+    init_lora_radio();
+    init_sensors();
 
-    if (boot_count == 1) {
-        read_sensors(prev_humidity, prev_distance);
+    // Store initial readings on first boot
+    if (g_boot_count == 1) {
+        read_all_sensors(g_prev_humidity, g_prev_distance);
     }
 }
 
+/* ============================================================================
+ * MAIN LOOP
+ * ============================================================================ */
+
 void loop()
 {
+    // Read sensors
     float humidity, distance;
-    read_sensors(humidity, distance);
-    bool presence = distance < PRESENCE_THRESHOLD_CM;
+    read_all_sensors(humidity, distance);
+    
+    bool presence_detected = (distance < PRESENCE_DISTANCE_CM);
 
-    DEBUG_PRINTF("[SENSOR] H=%.1f%%, D=%.0fcm, P=%s\n", 
-                humidity, distance, presence ? "YES" : "No");
+    LOG_F("[SENSORS] Moisture=%.1f%%, Distance=%.0fcm, Presence=%s\n", 
+          humidity, distance, presence_detected ? "YES" : "No");
 
+    // Decide whether to transmit
     bool should_send = true;
 
-#if ENABLE_ADAPTIVE_TX
+#if ADAPTIVE_TX_ENABLED
     should_send = should_transmit(humidity, distance);
     if (!should_send) {
-        DEBUG_PRINTLN("[TX] Skipped (no change)");
-        tx_skipped++;
+        LOG_LN("[TX] Skipped - values unchanged");
+        g_tx_stats.skipped++;
     }
 #endif
 
+    // Transmit if needed
     if (should_send) {
         if (transmit_sensor_data(humidity, distance)) {
-            tx_success++;
-            prev_humidity = humidity;
-            prev_distance = distance;
+            g_tx_stats.success++;
+            g_prev_humidity = humidity;
+            g_prev_distance = distance;
         } else {
-            tx_failed++;
+            g_tx_stats.failed++;
         }
     }
 
-    tx_count++;
+    g_tx_stats.total++;
 
-#if DEBUG_MODE
-    print_stats();
+#if DEBUG_ENABLED
+    print_statistics();
 #endif
 
-#if ENABLE_DEEP_SLEEP
-    DEBUG_PRINTF("[SLEEP] %ds\n", TX_INTERVAL_MS / 1000);
-    delay(50);
+    // Sleep or delay until next cycle
+#if DEEP_SLEEP_ENABLED
+    LOG_F("[POWER] Entering deep sleep for %d seconds\n", TX_INTERVAL_MS / 1000);
+    delay(50);  // Allow serial output to complete
     enter_deep_sleep();
 #else
     delay(TX_INTERVAL_MS);
 #endif
 }
 
-void setup_lora()
+/* ============================================================================
+ * LORA INITIALIZATION
+ * ============================================================================ */
+
+static void init_lora_radio()
 {
-    DEBUG_PRINTF("[LORA] Init %.1fMHz, SF%d, %ddBm\n", 
-                LORA_FREQUENCY, LORA_SPREADING, LORA_TX_POWER);
+    LOG_F("[LORA] Initializing: %.1f MHz, SF%d, %d dBm\n", 
+          LORA_FREQUENCY_MHZ, LORA_SPREADING_FACTOR, LORA_TX_POWER_DBM);
 
-    pinMode(LORA_RST, OUTPUT);
-    digitalWrite(LORA_RST, LOW);
+    // Hardware reset
+    pinMode(PIN_LORA_RST, OUTPUT);
+    digitalWrite(PIN_LORA_RST, LOW);
     delay(10);
-    digitalWrite(LORA_RST, HIGH);
+    digitalWrite(PIN_LORA_RST, HIGH);
     delay(10);
 
-    SPI.begin(LORA_SCK, LORA_MISO, LORA_MOSI, LORA_NSS);
+    // Initialize SPI
+    SPI.begin(PIN_LORA_SCK, PIN_LORA_MISO, PIN_LORA_MOSI, PIN_LORA_NSS);
     SPI.setFrequency(2000000);
     delay(100);
 
-    int state = radio.begin(
-        LORA_FREQUENCY,
-        LORA_BANDWIDTH,
-        LORA_SPREADING,
+    // Configure radio
+    int result = g_radio.begin(
+        LORA_FREQUENCY_MHZ,
+        LORA_BANDWIDTH_KHZ,
+        LORA_SPREADING_FACTOR,
         LORA_CODING_RATE,
         LORA_SYNC_WORD,
-        LORA_TX_POWER,
-        LORA_PREAMBLE);
+        LORA_TX_POWER_DBM,
+        LORA_PREAMBLE_LENGTH
+    );
 
-    if (state == RADIOLIB_ERR_NONE) {
-        lora_initialized = true;
-        radio.setCurrentLimit(140);
-        DEBUG_PRINTLN("[LORA] OK");
+    if (result == RADIOLIB_ERR_NONE) {
+        g_lora_ready = true;
+        g_radio.setCurrentLimit(140);
+        LOG_LN("[LORA] Initialized successfully");
     } else {
-        lora_initialized = false;
-        DEBUG_PRINTF("[LORA] FAILED (%d)\n", state);
+        g_lora_ready = false;
+        LOG_F("[LORA] FAILED to initialize (error %d)\n", result);
     }
 }
 
-void setup_sensors()
+/* ============================================================================
+ * SENSOR INITIALIZATION
+ * ============================================================================ */
+
+static void init_sensors()
 {
-#if USE_REAL_SENSORS
-    pinMode(ULTRASONIC_TRIG_PIN, OUTPUT);
-    pinMode(ULTRASONIC_ECHO_PIN, INPUT);
-    digitalWrite(ULTRASONIC_TRIG_PIN, LOW);
-    pinMode(MOISTURE_SENSOR_PIN, INPUT);
+#if REAL_SENSORS_ENABLED
+    // Ultrasonic sensor pins
+    pinMode(PIN_ULTRASONIC_TRIG, OUTPUT);
+    pinMode(PIN_ULTRASONIC_ECHO, INPUT);
+    digitalWrite(PIN_ULTRASONIC_TRIG, LOW);
+    
+    // Soil moisture sensor (analog input)
+    pinMode(PIN_SOIL_MOISTURE, INPUT);
     analogReadResolution(12);
-    DEBUG_PRINTLN("[SENSOR] Real sensors ready");
+    
+    LOG_LN("[SENSORS] Hardware sensors initialized");
 #else
-    DEBUG_PRINTLN("[SENSOR] Simulation mode");
+    LOG_LN("[SENSORS] Running in SIMULATION mode");
 #endif
 }
 
-float read_moisture_sensor()
+/* ============================================================================
+ * SOIL MOISTURE SENSOR (MH-RD)
+ * ============================================================================ */
+
+static float read_soil_moisture()
 {
-#if USE_REAL_SENSORS
+#if REAL_SENSORS_ENABLED
+    // Take multiple samples and average
     uint32_t sum = 0;
-    for (int i = 0; i < MOISTURE_SAMPLES; i++) {
-        sum += analogRead(MOISTURE_SENSOR_PIN);
+    for (int i = 0; i < SOIL_MOISTURE_SAMPLES; i++) {
+        sum += analogRead(PIN_SOIL_MOISTURE);
         delay(10);
     }
-    uint16_t avg = sum / MOISTURE_SAMPLES;
-    float range = (float)(MOISTURE_DRY_VALUE - MOISTURE_WET_VALUE);
-    float humidity = 100.0f - ((avg - MOISTURE_WET_VALUE) / range * 100.0f);
+    uint16_t avg_adc = sum / SOIL_MOISTURE_SAMPLES;
+    
+    // Convert ADC to percentage (inverted: lower ADC = wetter soil)
+    float adc_range = static_cast<float>(SOIL_ADC_DRY - SOIL_ADC_WET);
+    float humidity = 100.0f - ((avg_adc - SOIL_ADC_WET) / adc_range * 100.0f);
+    
     return constrain(humidity, 0.0f, 100.0f);
 #else
-    return simulate_sensor_reading(HUMID_BASE, HUMID_VARIATION);
+    return generate_simulated_value(SIM_HUMIDITY_BASE, SIM_HUMIDITY_VARIATION);
 #endif
 }
 
-float read_ultrasonic_distance()
+/* ============================================================================
+ * ULTRASONIC DISTANCE SENSOR (HC-SR04)
+ * ============================================================================ */
+
+static float read_ultrasonic_distance()
 {
-#if USE_REAL_SENSORS
-    digitalWrite(ULTRASONIC_TRIG_PIN, LOW);
+#if REAL_SENSORS_ENABLED
+    // Send trigger pulse
+    digitalWrite(PIN_ULTRASONIC_TRIG, LOW);
     delayMicroseconds(2);
-    digitalWrite(ULTRASONIC_TRIG_PIN, HIGH);
+    digitalWrite(PIN_ULTRASONIC_TRIG, HIGH);
     delayMicroseconds(10);
-    digitalWrite(ULTRASONIC_TRIG_PIN, LOW);
-    long duration = pulseIn(ULTRASONIC_ECHO_PIN, HIGH, ULTRASONIC_TIMEOUT_US);
-    float distance = (duration * 0.0343f) / 2.0f;
-    return constrain(distance, 2.0f, 400.0f);
+    digitalWrite(PIN_ULTRASONIC_TRIG, LOW);
+    
+    // Measure echo duration
+    long duration_us = pulseIn(PIN_ULTRASONIC_ECHO, HIGH, ULTRASONIC_TIMEOUT_US);
+    
+    // Convert to distance: speed of sound = 343 m/s = 0.0343 cm/µs
+    // Distance = (duration * 0.0343) / 2 (round trip)
+    float distance_cm = (duration_us * 0.0343f) / 2.0f;
+    
+    return constrain(distance_cm, 2.0f, 400.0f);
 #else
-    return simulate_sensor_reading(DISTANCE_BASE, DISTANCE_VARIATION);
+    return generate_simulated_value(SIM_DISTANCE_BASE, SIM_DISTANCE_VARIATION);
 #endif
 }
 
-void read_sensors(float& humid, float& distance)
+/* ============================================================================
+ * READ ALL SENSORS
+ * ============================================================================ */
+
+static void read_all_sensors(float& out_humidity, float& out_distance)
 {
-    humid = read_moisture_sensor();
-    distance = read_ultrasonic_distance();
-    humid = constrain(humid, 0.0f, 100.0f);
-    distance = constrain(distance, 5.0f, 400.0f);
+    out_humidity = read_soil_moisture();
+    out_distance = read_ultrasonic_distance();
+    
+    // Ensure values are within valid ranges
+    out_humidity = constrain(out_humidity, 0.0f, 100.0f);
+    out_distance = constrain(out_distance, 5.0f, 400.0f);
 }
 
-bool should_transmit(float humid, float distance)
+/* ============================================================================
+ * ADAPTIVE TRANSMISSION LOGIC
+ * ============================================================================ */
+
+static bool should_transmit(float humidity, float distance)
 {
-    if (boot_count == 1) return true;
-    if (boot_count % 10 == 0) return true;
-    if (fabsf(humid - prev_humidity) > HUMID_THRESHOLD) return true;
-    if (fabsf(distance - prev_distance) > DISTANCE_THRESHOLD) return true;
+    // Always transmit on first boot
+    if (g_boot_count == 1) {
+        return true;
+    }
+    
+    // Force transmission every 10th cycle (heartbeat)
+    if (g_boot_count % 10 == 0) {
+        return true;
+    }
+    
+    // Transmit if humidity changed significantly
+    if (fabsf(humidity - g_prev_humidity) > HUMIDITY_CHANGE_THRESHOLD) {
+        return true;
+    }
+    
+    // Transmit if distance changed significantly
+    if (fabsf(distance - g_prev_distance) > DISTANCE_CHANGE_THRESHOLD) {
+        return true;
+    }
+    
     return false;
 }
 
-bool transmit_sensor_data(float humid, float distance)
+/* ============================================================================
+ * LORA TRANSMISSION
+ * ============================================================================ */
+
+static bool transmit_sensor_data(float humidity, float distance)
 {
-    if (!lora_initialized) {
-        DEBUG_PRINTLN("[TX] LoRa not ready");
+    if (!g_lora_ready) {
+        LOG_LN("[TX] ERROR: LoRa radio not initialized");
         return false;
     }
 
+    // Build message
     SensorDataMessage msg;
-    msg.msg_type = MSG_TYPE_SENSOR_DATA;
-    msg.client_id = CLIENT_ID;
-    msg.timestamp = millis();
-    msg.temperature = 0;
-    msg.humidity = encode_humidity(humid);
+    msg.msg_type    = MSG_TYPE_SENSOR_DATA;
+    msg.client_id   = NODE_ID;
+    msg.timestamp   = millis();
+    msg.temperature = 0;  // Not implemented yet
+    msg.humidity    = encode_humidity(humidity);
     msg.distance_cm = static_cast<uint16_t>(distance);
-    msg.battery = 100;
-    msg.reserved = 0;
-    msg.checksum = calculate_checksum(reinterpret_cast<uint8_t*>(&msg), sizeof(msg));
+    msg.battery     = 100;  // TODO: implement battery monitoring
+    msg.reserved    = 0;
+    msg.checksum    = calculate_checksum(reinterpret_cast<uint8_t*>(&msg), sizeof(msg));
 
-    for (int attempt = 0; attempt < MAX_TX_RETRIES; attempt++) {
-        int state = radio.transmit(reinterpret_cast<uint8_t*>(&msg), sizeof(msg));
-        if (state == RADIOLIB_ERR_NONE) {
-            DEBUG_PRINTLN("[TX] OK");
+    // Transmit with retries
+    for (int attempt = 1; attempt <= TX_MAX_RETRIES; attempt++) {
+        int result = g_radio.transmit(reinterpret_cast<uint8_t*>(&msg), sizeof(msg));
+        
+        if (result == RADIOLIB_ERR_NONE) {
+            LOG_LN("[TX] Transmission successful");
             return true;
         }
-        DEBUG_PRINTF("[TX] Retry %d\n", attempt + 1);
+        
+        LOG_F("[TX] Attempt %d failed (error %d)\n", attempt, result);
         delay(100);
     }
 
-    DEBUG_PRINTLN("[TX] FAILED");
+    LOG_LN("[TX] All retry attempts failed");
     return false;
 }
 
-void enter_deep_sleep()
+/* ============================================================================
+ * POWER MANAGEMENT
+ * ============================================================================ */
+
+static void enter_deep_sleep()
 {
-    esp_sleep_enable_timer_wakeup(SLEEP_TIME_US);
+    esp_sleep_enable_timer_wakeup(DEEP_SLEEP_TIME_US);
     esp_deep_sleep_start();
 }
 
-void print_stats()
+/* ============================================================================
+ * STATISTICS & DEBUGGING
+ * ============================================================================ */
+
+static void print_statistics()
 {
-    if (tx_count > 0) {
-        float success_rate = (float)tx_success / tx_count * 100;
-        DEBUG_PRINTF("[STATS] TX:%u OK:%u FAIL:%u SKIP:%u (%.0f%%)\n",
-                     tx_count, tx_success, tx_failed, tx_skipped, success_rate);
+    if (g_tx_stats.total > 0) {
+        float success_rate = (static_cast<float>(g_tx_stats.success) / g_tx_stats.total) * 100.0f;
+        LOG_F("[STATS] Total=%u, Success=%u, Failed=%u, Skipped=%u (%.0f%% success)\n",
+              g_tx_stats.total, g_tx_stats.success, g_tx_stats.failed, 
+              g_tx_stats.skipped, success_rate);
     }
 }
 
-float simulate_sensor_reading(float base, float variation)
+/* ============================================================================
+ * SIMULATION UTILITIES
+ * ============================================================================ */
+
+static float generate_simulated_value(float base_value, float variation)
 {
     randomSeed(analogRead(0) + millis());
-    float factor = (float)random(-1000, 1000) / 1000.0f;
-    return base + (factor * variation);
+    float random_factor = static_cast<float>(random(-1000, 1000)) / 1000.0f;
+    return base_value + (random_factor * variation);
 }
