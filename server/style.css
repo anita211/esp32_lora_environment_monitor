@@ -1,0 +1,260 @@
+/* === ESP32 LoRa Environment Monitor - Dashboard === */
+:root {
+  --bg: #f8fafc;
+  --card-bg: #ffffff;
+  --card-border: #e2e8f0;
+  --text: #1e293b;
+  --text-muted: #64748b;
+  --accent: #16a34a;
+  --accent-blue: #2563eb;
+  --warning: #d97706;
+  --danger: #dc2626;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  line-height: 1.5;
+}
+
+.wrap {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+header {
+  margin-bottom: 24px;
+  text-align: center;
+}
+
+h1 {
+  margin: 0 0 8px 0;
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+header p {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--text-muted);
+}
+
+h2 {
+  margin: 0 0 16px 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* === Stats Row === */
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+}
+
+.stat-label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+
+.stat-value {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* === Status Indicator === */
+.status-dot {
+  font-size: 1rem !important;
+}
+
+.status-online {
+  color: var(--accent);
+}
+
+.status-offline {
+  color: var(--danger);
+}
+
+/* === Card === */
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.table-container {
+  width: 100%;
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+thead th {
+  text-align: left;
+  padding: 12px 10px;
+  border-bottom: 2px solid var(--card-border);
+  font-weight: 600;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+tbody td {
+  padding: 14px 10px;
+  border-bottom: 1px solid var(--card-border);
+}
+
+tbody tr:hover td {
+  background: #f1f5f9;
+}
+
+.center {
+  text-align: center;
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono", monospace;
+}
+
+.node-id {
+  font-weight: 600;
+  color: var(--accent-blue);
+}
+
+/* === Sensor Status Classes === */
+
+/* Umidade do solo */
+.moisture-dry {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.moisture-low {
+  color: var(--warning);
+  font-weight: 600;
+}
+
+.moisture-ok {
+  color: var(--accent);
+}
+
+.moisture-wet {
+  color: var(--accent-blue);
+}
+
+/* Bateria */
+.battery-critical {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.battery-low {
+  color: var(--warning);
+  font-weight: 600;
+}
+
+.battery-ok {
+  color: var(--accent);
+}
+
+/* Sinal RSSI */
+.signal-weak {
+  color: var(--danger);
+}
+
+.signal-fair {
+  color: var(--warning);
+}
+
+.signal-good {
+  color: var(--accent);
+}
+
+/* === Alerts === */
+.alert-item {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  background: #fef2f2;
+  border-left: 3px solid var(--danger);
+  border-radius: 6px;
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+}
+
+.alert-item.alert-ack {
+  opacity: 0.7;
+  background: #f1f5f9;
+  border-left-color: var(--text-muted);
+}
+
+.alert-time {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  min-width: 140px;
+}
+
+.alert-node {
+  font-weight: 600;
+  color: var(--accent-blue);
+  min-width: 60px;
+}
+
+.alert-msg {
+  color: var(--text);
+}
+
+/* === Responsive === */
+@media (max-width: 768px) {
+  .wrap {
+    padding: 16px;
+  }
+  
+  h1 {
+    font-size: 1.4rem;
+  }
+  
+  .stats-row {
+    grid-template-columns: 1fr;
+  }
+  
+  .stat-card {
+    padding: 16px;
+  }
+  
+  table {
+    font-size: 0.8rem;
+  }
+  
+  thead th, tbody td {
+    padding: 10px 6px;
+  }
+}
