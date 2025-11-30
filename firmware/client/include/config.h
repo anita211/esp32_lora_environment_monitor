@@ -85,6 +85,15 @@
 #define SOIL_ADC_WET            1500        // ADC value when sensor is wet (calibrate!)
 
 /* ============================================================================
+ * SENSOR - BH1750 LUMINOSITY (I2C)
+ * ============================================================================ */
+
+#define PIN_I2C_SDA             4           // I2C Data pin (GPIO4 / D3)
+#define PIN_I2C_SCL             5           // I2C Clock pin (GPIO5 / D4)
+#define BH1750_I2C_ADDRESS      0x23        // BH1750 default I2C address (ADDR pin low)
+// Alternative address: 0x5C when ADDR pin is high
+
+/* ============================================================================
  * SIMULATION MODE - Default Values
  * When REAL_SENSORS_ENABLED = false, these values are used as base + variation
  * ============================================================================ */
@@ -93,6 +102,10 @@
 #define SIM_HUMIDITY_VARIATION  35.0        // +/- variation range
 #define SIM_DISTANCE_BASE       150.0       // Base distance value (cm)
 #define SIM_DISTANCE_VARIATION  120.0       // +/- variation range
+#define SIM_TEMPERATURE_BASE    25.0        // Base temperature value (°C)
+#define SIM_TEMPERATURE_VARIATION 10.0      // +/- variation range
+#define SIM_LUMINOSITY_BASE     500.0       // Base luminosity value (lux)
+#define SIM_LUMINOSITY_VARIATION 400.0      // +/- variation range
 
 /* ============================================================================
  * DEBUG & SERIAL OUTPUT
@@ -149,6 +162,10 @@
 #define HUMID_VARIATION         SIM_HUMIDITY_VARIATION
 #define DISTANCE_BASE           SIM_DISTANCE_BASE
 #define DISTANCE_VARIATION      SIM_DISTANCE_VARIATION
+#define TEMP_BASE               SIM_TEMPERATURE_BASE
+#define TEMP_VARIATION          SIM_TEMPERATURE_VARIATION
+#define LUX_BASE                SIM_LUMINOSITY_BASE
+#define LUX_VARIATION           SIM_LUMINOSITY_VARIATION
 #define DEBUG_MODE              DEBUG_ENABLED
 #define SERIAL_BAUD             SERIAL_BAUD_RATE
 #define DEBUG_PRINT(x)          LOG(x)

@@ -151,7 +151,7 @@ tbody tr:hover td {
 
 /* === Sensor Status Classes === */
 
-/* Umidade do solo */
+/* Soil moisture */
 .moisture-dry {
   color: var(--danger);
   font-weight: 600;
@@ -170,7 +170,37 @@ tbody tr:hover td {
   color: var(--accent-blue);
 }
 
-/* Bateria */
+/* Temperature */
+.temp-cold {
+  color: var(--accent-blue);
+  font-weight: 600;
+}
+
+.temp-ok {
+  color: var(--accent);
+}
+
+.temp-hot {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+/* Luminosity */
+.lux-dark {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.lux-ok {
+  color: var(--accent);
+}
+
+.lux-bright {
+  color: var(--warning);
+  font-weight: 600;
+}
+
+/* Battery */
 .battery-critical {
   color: var(--danger);
   font-weight: 700;

@@ -36,7 +36,9 @@
               <tr>
                 <th>Node (ID)</th>
                 <th>Timestamp</th>
+                <th class="center">🌡️ Temperature</th>
                 <th class="center">💧 Soil Moisture</th>
+                <th class="center">☀️ Luminosity</th>
                 <th class="center">📏 Distance</th>
                 <th class="center">🔋 Battery</th>
                 <th class="center">📶 RSSI</th>
@@ -45,7 +47,7 @@
             </thead>
             <tbody id="table-body">
               <tr>
-                <td colspan="7" class="center mono">Waiting for sensor data...</td>
+                <td colspan="9" class="center mono">Waiting for sensor data...</td>
               </tr>
             </tbody>
           </table>
@@ -72,6 +74,22 @@
         if (value < 40) return "moisture-low";
         if (value > 80) return "moisture-wet";
         return "moisture-ok";
+      }
+
+      // Classificação de temperatura
+      function classifyTemperature(value) {
+        if (value == null || Number.isNaN(value)) return "";
+        if (value < 10) return "temp-cold";
+        if (value > 35) return "temp-hot";
+        return "temp-ok";
+      }
+
+      // Classificação de luminosidade
+      function classifyLuminosity(value) {
+        if (value == null || Number.isNaN(value)) return "";
+        if (value < 100) return "lux-dark";
+        if (value > 10000) return "lux-bright";
+        return "lux-ok";
       }
 
       // Classificação de bateria
@@ -101,7 +119,7 @@
           statusEl.className = "stat-value status-dot status-online";
         } catch (err) {
           const el = document.getElementById("table-body");
-          el.innerHTML = `<tr><td colspan="7" class="center mono">Failed to load data. Is the server running?</td></tr>`;
+          el.innerHTML = `<tr><td colspan="9" class="center mono">Failed to load data. Is the server running?</td></tr>`;
           statusEl.textContent = "● Offline";
           statusEl.className = "stat-value status-dot status-offline";
           console.error("Fetch error:", err);
@@ -127,7 +145,7 @@
         const activeNodesEl = document.getElementById("active-nodes");
 
         if (!Array.isArray(list) || list.length === 0) {
-          body.innerHTML = `<tr><td colspan="7" class="center mono">No data received yet...</td></tr>`;
+          body.innerHTML = `<tr><td colspan="9" class="center mono">No data received yet...</td></tr>`;
           activeNodesEl.textContent = "0";
           return;
         }
@@ -143,20 +161,34 @@
           const s = entry.sensors || entry;
           const radio = entry.radio || {};
 
-          // Umidade do solo
+          // Temperature
+          const tempVal = s.temperature_celsius ?? s.temperature;
+          const tempDisplay = typeof tempVal === "number"
+            ? tempVal.toFixed(1) + " °C"
+            : "N/A";
+          const tempClass = classifyTemperature(tempVal);
+
+          // Soil moisture (humidity)
           const moistureVal = s.humidity_percent ?? s.humidity;
           const moistureDisplay = typeof moistureVal === "number"
             ? moistureVal.toFixed(1) + " %"
             : "N/A";
           const moistureClass = classifyMoisture(moistureVal);
 
-          // Distância (ultrassônico)
+          // Luminosity
+          const luxVal = s.luminosity_lux ?? s.luminosity;
+          const luxDisplay = typeof luxVal === "number"
+            ? luxVal + " lux"
+            : "N/A";
+          const luxClass = classifyLuminosity(luxVal);
+
+          // Distance (ultrasonic)
           const distVal = s.distance_cm;
           const distDisplay = typeof distVal === "number"
             ? distVal + " cm"
             : "N/A";
 
-          // Bateria
+          // Battery
           const battVal = entry.battery_percent ?? s.battery;
           const battDisplay = typeof battVal === "number"
             ? battVal + " %"
@@ -180,7 +212,9 @@
           tr.innerHTML = `
             <td class="mono node-id">${node}</td>
             <td>${ts}</td>
+            <td class="center ${tempClass}">${tempDisplay}</td>
             <td class="center ${moistureClass}">${moistureDisplay}</td>
+            <td class="center ${luxClass}">${luxDisplay}</td>
             <td class="center">${distDisplay}</td>
             <td class="center ${battClass}">${battDisplay}</td>
             <td class="center ${rssiClass}">${rssiDisplay}</td>

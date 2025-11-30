@@ -30,8 +30,10 @@ def initialize_database() -> None:
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             node_id TEXT NOT NULL,
             timestamp TEXT NOT NULL,
+            temperature_celsius REAL,
             humidity_percent REAL,
             distance_cm INTEGER,
+            luminosity_lux INTEGER,
             presence_detected BOOLEAN,
             battery_percent INTEGER,
             rssi_dbm REAL,
@@ -90,14 +92,16 @@ def save_sensor_data(data: Dict[str, Any]) -> None:
     
     cursor.execute('''
         INSERT INTO sensor_data (
-            node_id, timestamp, humidity_percent, distance_cm, presence_detected,
-            battery_percent, rssi_dbm, snr_db, gateway_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            node_id, timestamp, temperature_celsius, humidity_percent, distance_cm,
+            luminosity_lux, presence_detected, battery_percent, rssi_dbm, snr_db, gateway_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (
         node_id,
         timestamp,
+        sensors.get('temperature_celsius', sensors.get('temperature')),
         sensors.get('humidity_percent', sensors.get('humidity')),
         sensors.get('distance_cm'),
+        sensors.get('luminosity_lux', sensors.get('luminosity')),
         sensors.get('presence_detected'),
         data.get('battery_percent'),
         radio.get('rssi_dbm', sensors.get('rssi_dbm')),
@@ -191,8 +195,8 @@ def fetch_recent_data(limit: int = 100) -> List[Dict[str, Any]]:
     cursor = connection.cursor()
     cursor.execute('''
         SELECT 
-            node_id, timestamp, humidity_percent, distance_cm, presence_detected,
-            battery_percent, rssi_dbm, snr_db, gateway_id
+            node_id, timestamp, temperature_celsius, humidity_percent, distance_cm,
+            luminosity_lux, presence_detected, battery_percent, rssi_dbm, snr_db, gateway_id
         FROM sensor_data 
         ORDER BY timestamp DESC 
         LIMIT ?
@@ -206,14 +210,16 @@ def fetch_recent_data(limit: int = 100) -> List[Dict[str, Any]]:
             'node_id': row[0],
             'timestamp': row[1],
             'sensors': {
-                'humidity_percent': row[2],
-                'distance_cm': row[3],
-                'presence_detected': bool(row[4]),
-                'rssi_dbm': row[6],
-                'snr_db': row[7]
+                'temperature_celsius': row[2],
+                'humidity_percent': row[3],
+                'distance_cm': row[4],
+                'luminosity_lux': row[5],
+                'presence_detected': bool(row[6]),
+                'rssi_dbm': row[8],
+                'snr_db': row[9]
             },
-            'battery_percent': row[5],
-            'gateway_id': row[8]
+            'battery_percent': row[7],
+            'gateway_id': row[10]
         })
     return data_rows
 

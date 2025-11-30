@@ -13,6 +13,10 @@
 | MH-RD | VCC | 3.3V | - | 3.3V ✓ |
 | MH-RD | AO | A2 | GPIO3 | 3.3V |
 | MH-RD | GND | GND | - | - |
+| BH1750 | VCC | 3.3V | - | 3.3V ✓ |
+| BH1750 | SDA | D3 | GPIO4 | 3.3V |
+| BH1750 | SCL | D4 | GPIO5 | 3.3V |
+| BH1750 | GND | GND | - | - |
 
 ### 1️⃣ **HC-SR04 (Ultrasonic Distance Sensor)**
 
@@ -45,7 +49,7 @@ Voltage at GPIO2 = 5V × (2kΩ / 3kΩ) = 3.33V ✓
 
 ---
 
-### MH-RD (Soil Moisture Sensor)
+### 2️⃣ **MH-RD (Soil Moisture Sensor)**
 
 ```
 MH-RD Module     XIAO ESP32-S3
@@ -63,6 +67,34 @@ MH-RD Module     XIAO ESP32-S3
 - The DO (Digital) output is not needed
 - The sensor works **inverted**: lower ADC value = wetter soil
 - Pin A2 (GPIO3) does not conflict with HC-SR04
+
+---
+
+### 3️⃣ **BH1750 (Luminosity Sensor)**
+
+```
+BH1750 Module    XIAO ESP32-S3
+┌────────────┐   ┌────────────┐
+│    VCC     │───│   3.3V     │ ✓
+│    GND     │───│    GND     │
+│    SDA     │───│ D3 (GPIO4) │ ← I2C Data
+│    SCL     │───│ D4 (GPIO5) │ ← I2C Clock
+│   ADDR     │───│ GND (0x23) │ ← Optional: VCC for 0x5C
+└────────────┘   └────────────┘
+```
+
+**Notes:**
+- ✓ **3.3V compatible** - Works natively with ESP32
+- **I2C Address:** 0x23 (default, ADDR→GND) or 0x5C (ADDR→VCC)
+- Measurement range: 1 - 65535 lux
+- Automatically adjusts measurement time based on light level
+
+**I2C Configuration in `config.h`:**
+```cpp
+#define PIN_I2C_SDA        4           // GPIO4 / D3
+#define PIN_I2C_SCL        5           // GPIO5 / D4
+#define BH1750_I2C_ADDRESS 0x23        // Default address
+```
 
 ---
 
@@ -137,7 +169,8 @@ platformio device monitor
 Initializing sensors...
 ✓ HC-SR04 initialized (TRIG: GPIO1, ECHO: GPIO2)
 ✓ MH-RD Moisture sensor initialized (ADC: GPIO3)
-Test readings: Moisture=45.2%, Distance=125.3cm
+✓ BH1750 luminosity sensor initialized (I2C: 0x23)
+Test readings: Moisture=45.2%, Distance=125.3cm, Lux=850
 Sensors ready
 ```
 
@@ -146,8 +179,10 @@ Sensors ready
 --- Measurement Cycle ---
 [SENSORS] MH-RD ADC: 2850, Humidity: 52.3%
 [SENSORS] HC-SR04: 85.2 cm
+[SENSORS] BH1750: 1250 lux
 Moisture: 52.30 %
 Distance: 85.20 cm
+Luminosity: 1250 lux
 Presence: DETECTED  ← Object < 100cm detected!
 ```
 
@@ -178,6 +213,19 @@ Presence: DETECTED  ← Object < 100cm detected!
 - Use short, shielded wires
 - Add 100µF capacitor between sensor VCC and GND
 
+### BH1750 Not Detected
+✅ **Solutions:**
+- Check I2C wiring (SDA → GPIO4, SCL → GPIO5)
+- Verify I2C address (0x23 with ADDR→GND, 0x5C with ADDR→VCC)
+- Use I2C scanner sketch to find device
+- Ensure 3.3V power supply
+
+### BH1750 Shows 0 or -1 lux
+✅ **Solutions:**
+- Sensor may be in very dark environment (normal if < 1 lux)
+- Check if sensor is initialized correctly in Serial Monitor
+- Verify I2C pull-up resistors (usually built into module)
+
 ---
 
 ## 📊 Data Interpretation
@@ -198,6 +246,16 @@ Presence: DETECTED  ← Object < 100cm detected!
 | 100-200cm | ✗ Not detected | Outside threshold |
 | > 200cm | ✗ Not detected | Far away or no object |
 
+### Luminosity Sensor (BH1750)
+| Lux Value | Condition | Environment |
+|-----------|-----------|-------------|
+| 0-50 | Very dark | Night, closed room |
+| 50-200 | Dim | Indoor, cloudy day |
+| 200-1000 | Normal indoor | Office, home |
+| 1000-10000 | Bright | Near window, shade |
+| 10000-50000 | Very bright | Direct sunlight |
+| > 50000 | Extremely bright | Full sun exposure |
+
 ---
 
 ## 🔋 Power Consumption
@@ -206,6 +264,7 @@ Presence: DETECTED  ← Object < 100cm detected!
 - ESP32-S3: ~240mA
 - HC-SR04: ~15mA (during measurement, 2ms)
 - MH-RD: ~5mA
+- BH1750: ~0.12mA (measurement), ~0.01mA (sleep)
 - **Total: ~260mA for ~3 seconds**
 
 **Deep Sleep Mode:**
@@ -219,10 +278,11 @@ Presence: DETECTED  ← Object < 100cm detected!
 
 - [ ] HC-SR04 has **voltage divider** on ECHO
 - [ ] MH-RD connected to A2 pin (GPIO3)
+- [ ] BH1750 connected via I2C (SDA→GPIO4, SCL→GPIO5)
 - [ ] HC-SR04 powered with **5V**
-- [ ] MH-RD powered with **3.3V**
+- [ ] MH-RD and BH1750 powered with **3.3V**
 - [ ] `REAL_SENSORS_ENABLED` = `true` in config.h
-- [ ] DRY and WET values calibrated
+- [ ] DRY and WET values calibrated for soil moisture
 - [ ] Serial Monitor open for debugging
 
 ---

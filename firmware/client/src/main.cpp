@@ -2,18 +2,21 @@
  * @file main.cpp
  * @brief ESP32 LoRa Environment Monitor - Sensor Node (Client)
  * 
- * This firmware reads environmental sensors (soil moisture, ultrasonic distance)
- * and transmits data via LoRa to a gateway node.
+ * This firmware reads environmental sensors (soil moisture, ultrasonic distance,
+ * temperature, and luminosity) and transmits data via LoRa to a gateway node.
  * 
  * Hardware:
  *   - Seeed XIAO ESP32-S3
  *   - SX1262 LoRa module
  *   - MH-RD soil moisture sensor
  *   - HC-SR04 ultrasonic distance sensor
+ *   - BH1750 luminosity sensor (I2C)
  */
 
 #include <Arduino.h>
 #include <RadioLib.h>
+#include <Wire.h>
+#include <BH1750.h>
 #include <math.h>
 #include "config.h"
 #include "protocol.h"
@@ -24,6 +27,9 @@
 
 // LoRa radio instance
 static SX1262 g_radio = new Module(PIN_LORA_NSS, PIN_LORA_DIO1, PIN_LORA_RST, PIN_LORA_BUSY);
+
+// BH1750 luminosity sensor instance
+static BH1750 g_lux_sensor(BH1750_I2C_ADDRESS);
 
 // Previous sensor readings (for adaptive transmission)
 static float g_prev_humidity = 0.0f;
@@ -54,11 +60,13 @@ static void init_sensors();
 // Sensor reading
 static float read_soil_moisture();
 static float read_ultrasonic_distance();
-static void  read_all_sensors(float& out_humidity, float& out_distance);
+static float read_temperature();
+static uint16_t read_luminosity();
+static void  read_all_sensors(float& out_humidity, float& out_distance, float& out_temperature, uint16_t& out_luminosity);
 
 // Transmission logic
 static bool should_transmit(float humidity, float distance);
-static bool transmit_sensor_data(float humidity, float distance);
+static bool transmit_sensor_data(float humidity, float distance, float temperature, uint16_t luminosity);
 
 // Power management
 static void enter_deep_sleep();
@@ -88,7 +96,9 @@ void setup()
 
     // Store initial readings on first boot
     if (g_boot_count == 1) {
-        read_all_sensors(g_prev_humidity, g_prev_distance);
+        float temp;
+        uint16_t lux;
+        read_all_sensors(g_prev_humidity, g_prev_distance, temp, lux);
     }
 }
 
@@ -99,13 +109,14 @@ void setup()
 void loop()
 {
     // Read sensors
-    float humidity, distance;
-    read_all_sensors(humidity, distance);
+    float humidity, distance, temperature;
+    uint16_t luminosity;
+    read_all_sensors(humidity, distance, temperature, luminosity);
     
     bool presence_detected = (distance < PRESENCE_DISTANCE_CM);
 
-    LOG_F("[SENSORS] Moisture=%.1f%%, Distance=%.0fcm, Presence=%s\n", 
-          humidity, distance, presence_detected ? "YES" : "No");
+    LOG_F("[SENSORS] Moisture=%.1f%%, Distance=%.0fcm, Temp=%.1f°C, Lux=%u, Presence=%s\n", 
+          humidity, distance, temperature, luminosity, presence_detected ? "YES" : "No");
 
     // Decide whether to transmit
     bool should_send = true;
@@ -120,7 +131,7 @@ void loop()
 
     // Transmit if needed
     if (should_send) {
-        if (transmit_sensor_data(humidity, distance)) {
+        if (transmit_sensor_data(humidity, distance, temperature, luminosity)) {
             g_tx_stats.success++;
             g_prev_humidity = humidity;
             g_prev_distance = distance;
@@ -203,6 +214,16 @@ static void init_sensors()
     pinMode(PIN_SOIL_MOISTURE, INPUT);
     analogReadResolution(12);
     
+    // Initialize I2C for BH1750
+    Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
+    
+    // Initialize BH1750 luminosity sensor
+    if (g_lux_sensor.begin(BH1750::CONTINUOUS_HIGH_RES_MODE)) {
+        LOG_LN("[SENSORS] BH1750 luminosity sensor initialized");
+    } else {
+        LOG_LN("[SENSORS] WARNING: BH1750 initialization failed!");
+    }
+    
     LOG_LN("[SENSORS] Hardware sensors initialized");
 #else
     LOG_LN("[SENSORS] Running in SIMULATION mode");
@@ -262,17 +283,54 @@ static float read_ultrasonic_distance()
 }
 
 /* ============================================================================
+ * TEMPERATURE SENSOR (simulated for now, can be DHT or other)
+ * ============================================================================ */
+
+static float read_temperature()
+{
+#if REAL_SENSORS_ENABLED
+    // TODO: Implement actual temperature sensor reading
+    // For now, return a reasonable default or implement with DHT sensor
+    return 25.0f;  // Default temperature
+#else
+    return generate_simulated_value(SIM_TEMPERATURE_BASE, SIM_TEMPERATURE_VARIATION);
+#endif
+}
+
+/* ============================================================================
+ * LUMINOSITY SENSOR (BH1750)
+ * ============================================================================ */
+
+static uint16_t read_luminosity()
+{
+#if REAL_SENSORS_ENABLED
+    float lux = g_lux_sensor.readLightLevel();
+    if (lux < 0) {
+        LOG_LN("[SENSORS] BH1750 read error, returning 0");
+        return 0;
+    }
+    return static_cast<uint16_t>(constrain(lux, 0.0f, 65535.0f));
+#else
+    float lux = generate_simulated_value(SIM_LUMINOSITY_BASE, SIM_LUMINOSITY_VARIATION);
+    return static_cast<uint16_t>(constrain(lux, 0.0f, 65535.0f));
+#endif
+}
+
+/* ============================================================================
  * READ ALL SENSORS
  * ============================================================================ */
 
-static void read_all_sensors(float& out_humidity, float& out_distance)
+static void read_all_sensors(float& out_humidity, float& out_distance, float& out_temperature, uint16_t& out_luminosity)
 {
     out_humidity = read_soil_moisture();
     out_distance = read_ultrasonic_distance();
+    out_temperature = read_temperature();
+    out_luminosity = read_luminosity();
     
     // Ensure values are within valid ranges
     out_humidity = constrain(out_humidity, 0.0f, 100.0f);
     out_distance = constrain(out_distance, 5.0f, 400.0f);
+    out_temperature = constrain(out_temperature, -40.0f, 80.0f);
 }
 
 /* ============================================================================
@@ -308,7 +366,7 @@ static bool should_transmit(float humidity, float distance)
  * LORA TRANSMISSION
  * ============================================================================ */
 
-static bool transmit_sensor_data(float humidity, float distance)
+static bool transmit_sensor_data(float humidity, float distance, float temperature, uint16_t luminosity)
 {
     if (!g_lora_ready) {
         LOG_LN("[TX] ERROR: LoRa radio not initialized");
@@ -317,15 +375,16 @@ static bool transmit_sensor_data(float humidity, float distance)
 
     // Build message
     SensorDataMessage msg;
-    msg.msg_type    = MSG_TYPE_SENSOR_DATA;
-    msg.client_id   = NODE_ID;
-    msg.timestamp   = millis();
-    msg.temperature = 0;  // Not implemented yet
-    msg.humidity    = encode_humidity(humidity);
-    msg.distance_cm = static_cast<uint16_t>(distance);
-    msg.battery     = 100;  // TODO: implement battery monitoring
-    msg.reserved    = 0;
-    msg.checksum    = calculate_checksum(reinterpret_cast<uint8_t*>(&msg), sizeof(msg));
+    msg.msg_type      = MSG_TYPE_SENSOR_DATA;
+    msg.client_id     = NODE_ID;
+    msg.timestamp     = millis();
+    msg.temperature   = encode_temperature(temperature);
+    msg.humidity      = encode_humidity(humidity);
+    msg.distance_cm   = static_cast<uint16_t>(distance);
+    msg.battery       = 100;  // TODO: implement battery monitoring
+    msg.luminosity_lux = luminosity;
+    msg.reserved      = 0;
+    msg.checksum      = calculate_checksum(reinterpret_cast<uint8_t*>(&msg), sizeof(msg));
 
     // Transmit with retries
     for (int attempt = 1; attempt <= TX_MAX_RETRIES; attempt++) {

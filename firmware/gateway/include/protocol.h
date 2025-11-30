@@ -65,16 +65,18 @@ typedef enum {
  * Sent periodically with current sensor readings.
  * Temperature is encoded as value * 100 (e.g., 25.5°C = 2550)
  * Humidity is encoded as value * 100 (e.g., 65.5% = 6550)
+ * Luminosity is in lux (0-65535)
  */
 struct __attribute__((packed)) SensorDataMessage {
     uint8_t     msg_type;       // MSG_TYPE_SENSOR_DATA (0x01)
     uint8_t     client_id;      // Node identifier (1-255)
     uint32_t    timestamp;      // Milliseconds since boot
-    int16_t     temperature;    // Temperature * 100 (°C) - reserved
-    uint16_t    humidity;       // Soil moisture * 100 (%)
+    int16_t     temperature;    // Temperature * 100 (°C) - from soil moisture sensor
+    uint16_t    humidity;       // Humidity * 100 (%) - soil moisture
     uint16_t    distance_cm;    // Distance in centimeters
     uint8_t     battery;        // Battery level (0-100%)
-    uint16_t    reserved;       // Reserved for future use
+    uint16_t    luminosity_lux; // Luminosity in lux (BH1750 sensor)
+    uint8_t     reserved;       // Reserved for future use
     uint8_t     checksum;       // XOR checksum of all preceding bytes
 };
 

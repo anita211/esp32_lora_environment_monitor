@@ -38,8 +38,10 @@ def generate_random_data():
     
     for node in NODES:
         # Random sensor values
+        temperature = random.uniform(15, 40)  # Temperature °C
         humidity = random.uniform(15, 95)  # Soil moisture %
         distance = random.randint(5, 200)  # Distance cm
+        luminosity = random.randint(50, 15000)  # Luminosity lux
         battery = random.randint(20, 100)  # Battery %
         rssi = random.randint(-120, -40)   # RSSI dBm
         snr = random.uniform(-5, 15)       # SNR dB
@@ -48,8 +50,10 @@ def generate_random_data():
             "node_id": node["id"],
             "timestamp": timestamp,
             "sensors": {
+                "temperature_celsius": temperature,
                 "humidity_percent": humidity,
                 "distance_cm": distance,
+                "luminosity_lux": luminosity,
             },
             "battery_percent": battery,
             "radio": {
@@ -82,6 +86,14 @@ def generate_random_data():
                 "node_id": node["id"],
                 "alert_type": "WEAK_SIGNAL",
                 "message": f"Weak LoRa signal: {rssi} dBm",
+                "acknowledged": False
+            })
+        if temperature > 35:
+            alerts.insert(0, {
+                "timestamp": timestamp,
+                "node_id": node["id"],
+                "alert_type": "HIGH_TEMP",
+                "message": f"High temperature: {temperature:.1f}°C",
                 "acknowledged": False
             })
     

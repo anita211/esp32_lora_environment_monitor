@@ -358,12 +358,14 @@ static void process_received_message(uint8_t* data, size_t length, float rssi, f
 
 static void handle_sensor_data(SensorDataMessage* msg, float rssi, float snr)
 {
+    const float temperature = decode_temperature(msg->temperature);
     const float humidity = decode_humidity(msg->humidity);
     const uint16_t distance = msg->distance_cm;
+    const uint16_t luminosity = msg->luminosity_lux;
     const bool presence = distance < 100;
 
-    LOG_F("[DATA] Node %d: Moisture=%.1f%%, Distance=%dcm, Presence=%s, Battery=%d%%\n",
-          msg->client_id, humidity, distance, presence ? "YES" : "No", msg->battery);
+    LOG_F("[DATA] Node %d: Temp=%.1f°C, Moisture=%.1f%%, Distance=%dcm, Lux=%u, Presence=%s, Battery=%d%%\n",
+          msg->client_id, temperature, humidity, distance, luminosity, presence ? "YES" : "No", msg->battery);
 
     String json = build_sensor_json(msg, rssi, snr);
 
@@ -407,7 +409,7 @@ static String get_iso8601_timestamp()
 
 static String build_sensor_json(SensorDataMessage* msg, float rssi, float snr)
 {
-    StaticJsonDocument<384> doc;
+    StaticJsonDocument<512> doc;
 
     // Node identification
     char node_id[20];
@@ -420,13 +422,17 @@ static String build_sensor_json(SensorDataMessage* msg, float rssi, float snr)
     doc["client_timestamp"] = msg->timestamp;
 
     // Sensor data
+    const float temperature = decode_temperature(msg->temperature);
     const float humidity = decode_humidity(msg->humidity);
     const uint16_t distance = msg->distance_cm;
+    const uint16_t luminosity = msg->luminosity_lux;
     const bool presence = distance < 100;
 
     JsonObject sensors = doc["sensors"].to<JsonObject>();
+    sensors["temperature_celsius"] = temperature;
     sensors["humidity_percent"] = humidity;
     sensors["distance_cm"] = distance;
+    sensors["luminosity_lux"] = luminosity;
     sensors["presence_detected"] = presence;
 
     // Battery
