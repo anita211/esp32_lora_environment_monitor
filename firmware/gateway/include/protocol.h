@@ -1,23 +1,8 @@
-/**
- * @file protocol.h
- * @brief Binary protocol definitions for LoRa communication
- * 
- * Defines message structures and utility functions for communication
- * between sensor nodes (clients) and the gateway.
- * 
- * All structs are packed to ensure consistent byte layout across platforms.
- * This file should be identical on both client and gateway.
- */
-
 #ifndef PROTOCOL_H
 #define PROTOCOL_H
 
 #include <stdint.h>
 #include <stddef.h>
-
-/* ============================================================================
- * MESSAGE TYPE IDENTIFIERS
- * ============================================================================ */
 
 typedef enum {
     MSG_TYPE_SENSOR_DATA    = 0x01,     // Regular sensor data transmission
