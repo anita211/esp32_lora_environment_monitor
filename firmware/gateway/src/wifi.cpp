@@ -176,3 +176,25 @@ String build_gateway_stats_json() {
     serializeJson(doc, json);
     return json;
 }
+
+void check_wifi_connection() {
+  #ifdef WIFI_ON
+  if (!WiFi.isConnected() && g_wifi_connected) {
+      print_log("WiFi disconnected, trying to connect again...");
+      g_wifi_connected = false;
+      init_wifi();
+  }
+  #endif
+}
+
+int get_current_wifi_rssi() {
+#ifdef WIFI_ON
+    if (g_wifi_connected) {
+        return WiFi.RSSI();
+    } else {
+        return 0;
+    }
+#else
+    return 0;
+#endif
+}

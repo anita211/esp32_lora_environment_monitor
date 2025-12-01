@@ -25,6 +25,8 @@ extern struct g_server_stats_t g_server_stats;
 extern struct g_latency_t g_latency;
 
 void init_wifi();
+void check_wifi_connection();
+int get_current_wifi_rssi();
 void forward_to_server(const char* json_data);
 void send_gateway_statistics();
 String build_gateway_stats_json();

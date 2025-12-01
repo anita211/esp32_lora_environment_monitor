@@ -12,22 +12,15 @@
 #include "energy_manager.h"
 #include "utils.h"
 
-#ifdef WIFI_ON
-#include <HTTPClient.h>
-#include <WiFi.h>
-#endif
 
 static uint32_t last_stats_time = 0;
 
 #ifdef SIMUL_DATA
 static uint32_t last_simul_time = 0;
+static void generate_fake_packet();
 #endif
 
 static void print_statistics();
-
-#ifdef SIMUL_DATA
-static void generate_fake_packet();
-#endif
 
 void setup() {
     print_log("Node %d - Setting up...\n", NODE_ID);
@@ -37,9 +30,7 @@ void setup() {
 
     LoRaRadio::get_instance().setup();
 
-#ifdef WIFI_ON
     init_wifi();
-#endif
 
     print_log("Initialized\n");
     last_stats_time = millis();
@@ -70,13 +61,7 @@ void loop() {
         last_stats_time = millis();
     }
 
-#ifdef WIFI_ON
-    if (!WiFi.isConnected() && g_wifi_connected) {
-        print_log("WiFi disconnected, trying to connect again...");
-        g_wifi_connected = false;
-        init_wifi();
-    }
-#endif
+    check_wifi_connection();
 }
 
 static void print_statistics() {
@@ -103,7 +88,7 @@ static void print_statistics() {
     print_log("Energy consumption: %.2f mAh\n", g_energy.total_mah);
 #ifdef WIFI_ON
     if (g_wifi_connected) {
-        print_log("WiFi signal strength: %d dBm\n", WiFi.RSSI());
+        print_log("WiFi signal strength: %d dBm\n", get_current_wifi_rssi());
     }
 #endif
     print_log("\n\n");
