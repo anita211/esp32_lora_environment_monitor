@@ -4,7 +4,7 @@
 #define NODE_ID              23           // Max 255
 
 #define DEBUG
-#define SIMUL_DATA
+// #define SIMUL_DATA
 #define SIMUL_PERIOD_MS         15000
 #define STATS_PERIOD_MS         60000
 
