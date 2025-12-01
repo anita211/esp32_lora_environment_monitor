@@ -25,8 +25,8 @@ static void print_statistics();
 void setup() {
     print_log("Node %d - Setting up...\n", NODE_ID);
 
-    g_energy.start_time = millis();
-    g_energy.last_calc_time = millis();
+    energy.start_time = millis();
+    energy.last_calc_time = millis();
 
     LoRaRadio::get_instance().setup();
 
@@ -67,27 +67,27 @@ void loop() {
 static void print_statistics() {
     LoRaRadio::Stats lora_stats = LoRaRadio::get_instance().get_stats();
     
-    uint32_t uptime_s = (millis() - g_energy.start_time) / 1000;
-    float avg_latency = g_latency.samples > 0
-        ? (static_cast<float>(g_latency.total_ms) / g_latency.samples) : 0.0f;
+    uint32_t uptime_s = (millis() - energy.start_time) / 1000;
+    float avg_latency = latency.samples > 0
+        ? (static_cast<float>(latency.total_ms) / latency.samples) : 0.0f;
     float packet_loss = lora_stats.total_rx_packets > 0
         ? (static_cast<float>(lora_stats.total_rx_invalids) / lora_stats.total_rx_packets * 100.0f) : 0.0f;
-    float server_success = g_server_stats.total > 0
-        ? (static_cast<float>(g_server_stats.success) / g_server_stats.total * 100.0f) : 0.0f;
+    float server_success = server_stats.total > 0
+        ? (static_cast<float>(server_stats.success) / server_stats.total * 100.0f) : 0.0f;
 
     print_log("\n\nStatistics of gateway:\n");
     print_log("Uptime: %02u:%02u:%02u\n", uptime_s / 3600, (uptime_s % 3600) / 60, uptime_s % 60);
     print_log("LoRa RX - Valid: %u | Invalid: %u | Loss: %.1f%%\n",
           lora_stats.total_rx_valids, lora_stats.total_rx_invalids, packet_loss);
     print_log("Server TX - Success: %u/%u | Rate: %.1f%%\n",
-          g_server_stats.success, g_server_stats.total, server_success);
-    if (g_latency.samples > 0) {
+          server_stats.success, server_stats.total, server_success);
+    if (latency.samples > 0) {
         print_log("Latency - Avg: %.0f ms | Range: %u-%u ms\n", avg_latency,
-              g_latency.min_ms == UINT32_MAX ? 0 : g_latency.min_ms, g_latency.max_ms);
+              latency.min_ms == UINT32_MAX ? 0 : latency.min_ms, latency.max_ms);
     }
-    print_log("Energy consumption: %.2f mAh\n", g_energy.total_mah);
+    print_log("Energy consumption: %.2f mAh\n", energy.total_mah);
 #ifdef WIFI_ON
-    if (g_wifi_connected) {
+    if (wifi_connected) {
         print_log("WiFi signal strength: %d dBm\n", get_current_wifi_rssi());
     }
 #endif

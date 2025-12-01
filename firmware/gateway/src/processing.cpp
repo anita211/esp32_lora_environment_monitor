@@ -145,7 +145,7 @@ void handle_sensor_data(SensorDataMessage* msg, float rssi, float snr) {
     String json = build_sensor_json(msg, rssi, snr);
 
 #ifdef WIFI_ON
-    if (g_wifi_connected) {
+    if (wifi_connected) {
 #ifdef BATCH_ON
         add_to_batch(json);
 #else

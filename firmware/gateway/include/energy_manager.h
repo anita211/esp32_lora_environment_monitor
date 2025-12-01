@@ -3,12 +3,12 @@
 
 #include <Arduino.h>
 
-struct g_energy_t {
+struct energy_t {
     uint32_t start_time;
     float total_mah;
     uint32_t last_calc_time;
 };
-extern struct g_energy_t g_energy;
+extern struct energy_t energy;
 
 static const float CURRENT_ACTIVE_MA = 120.0f;
 static const float CURRENT_WIFI_TX_MA = 220.0f;

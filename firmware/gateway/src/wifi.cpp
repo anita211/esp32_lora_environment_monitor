@@ -11,12 +11,12 @@
 #include <time.h>
 
 
-bool g_wifi_connected = false;
-bool g_time_synced = false;
+bool wifi_connected = false;
+bool time_synced = false;
 
-struct g_server_stats_t g_server_stats = {0, 0, 0};
+struct server_stats_t server_stats = {0, 0, 0};
 
-struct g_latency_t g_latency = {0, 0, UINT32_MAX, 0, 0};
+struct latency_t latency = {0, 0, UINT32_MAX, 0, 0};
 
 
 void init_wifi() {
@@ -32,7 +32,7 @@ void init_wifi() {
     }
 
     if (WiFi.status() == WL_CONNECTED) {
-        g_wifi_connected = true;
+        wifi_connected = true;
         print_log("Connected - IP: %s\n", WiFi.localIP().toString().c_str());
 
         configTime(-3 * 3600, 0, "pool.ntp.org");  // UTC-3 (Brazil)
@@ -41,10 +41,10 @@ void init_wifi() {
             delay(500);
             retry++;
         }
-        g_time_synced = (time(nullptr) > 100000);
-        print_log("Synchronization of time: %s\n", g_time_synced ? "OK" : "FAILED");
+        time_synced = (time(nullptr) > 100000);
+        print_log("Synchronization of time: %s\n", time_synced ? "OK" : "FAILED");
     } else {
-        g_wifi_connected = false;
+        wifi_connected = false;
         print_log("Couldn't connect to WiFi\n");
     }
 #endif
@@ -52,7 +52,7 @@ void init_wifi() {
 
 void forward_to_server(const char* json_data) {
 #ifdef WIFI_ON
-    if (!g_wifi_connected) return;
+    if (!wifi_connected) return;
 
     HTTPClient http;
     String url = String("http://") + SERVER_HOST + ":" + SERVER_PORT + SERVER_ENDPOINT_DATA;
@@ -63,24 +63,24 @@ void forward_to_server(const char* json_data) {
     http.addHeader("Content-Type", "application/json");
     int http_code = http.POST(json_data);
 
-    g_latency.last_ms = millis() - start_time;
-    g_server_stats.total++;
+    latency.last_ms = millis() - start_time;
+    server_stats.total++;
 
     if (http_code > 0) {
-        g_latency.total_ms += g_latency.last_ms;
-        g_latency.samples++;
-        if (g_latency.last_ms < g_latency.min_ms) g_latency.min_ms = g_latency.last_ms;
-        if (g_latency.last_ms > g_latency.max_ms) g_latency.max_ms = g_latency.last_ms;
+        latency.total_ms += latency.last_ms;
+        latency.samples++;
+        if (latency.last_ms < latency.min_ms) latency.min_ms = latency.last_ms;
+        if (latency.last_ms > latency.max_ms) latency.max_ms = latency.last_ms;
 
         if (http_code == HTTP_CODE_OK || http_code == HTTP_CODE_CREATED) {
-            g_server_stats.success++;
-            print_log("Foward to server success: %u ms\n", g_latency.last_ms);
+            server_stats.success++;
+            print_log("Foward to server success: %u ms\n", latency.last_ms);
         } else {
-            g_server_stats.failed++;
+            server_stats.failed++;
             print_log("Error response code: %d\n", http_code);
         }
     } else {
-        g_server_stats.failed++;
+        server_stats.failed++;
         print_log("Forwarding to server failed: %s\n", http.errorToString(http_code).c_str());
     }
 
@@ -90,7 +90,7 @@ void forward_to_server(const char* json_data) {
 
 void send_gateway_statistics() {
 #ifdef WIFI_ON
-    if (!g_wifi_connected) return;
+    if (!wifi_connected) return;
 
     HTTPClient http;
     String url = String("http://") + SERVER_HOST + ":" + SERVER_PORT + SERVER_ENDPOINT_STATS;
@@ -106,7 +106,7 @@ void send_gateway_statistics() {
 }
 
 String get_iso8601_timestamp() {
-    if (g_time_synced) {
+    if (time_synced) {
         struct timeval tv;
         gettimeofday(&tv, NULL);
 
@@ -135,7 +135,7 @@ String build_gateway_stats_json() {
     doc["NODE_ID"] = NODE_ID;
     doc["timestamp"] = get_iso8601_timestamp();
 
-    uint32_t uptime_seconds = (millis() - g_energy.start_time) / 1000;
+    uint32_t uptime_seconds = (millis() - energy.start_time) / 1000;
     doc["uptime_seconds"] = uptime_seconds;
 
     // LoRa statistics
@@ -149,26 +149,26 @@ String build_gateway_stats_json() {
 
     // Server statistics
     JsonObject server = doc["server_stats"].to<JsonObject>();
-    server["tx_total"] = g_server_stats.total;
-    server["tx_success"] = g_server_stats.success;
-    server["tx_failed"] = g_server_stats.failed;
-    server["success_rate_percent"] = g_server_stats.total > 0
-        ? (static_cast<float>(g_server_stats.success) / g_server_stats.total * 100.0f) : 0.0f;
+    server["tx_total"] = server_stats.total;
+    server["tx_success"] = server_stats.success;
+    server["tx_failed"] = server_stats.failed;
+    server["success_rate_percent"] = server_stats.total > 0
+        ? (static_cast<float>(server_stats.success) / server_stats.total * 100.0f) : 0.0f;
 
-    // Latency statistics
-    JsonObject latency = doc["latency"].to<JsonObject>();
-    latency["avg_ms"] = g_latency.samples > 0
-        ? (static_cast<float>(g_latency.total_ms) / g_latency.samples) : 0.0f;
-    latency["min_ms"] = g_latency.min_ms == UINT32_MAX ? 0 : g_latency.min_ms;
-    latency["max_ms"] = g_latency.max_ms;
-    latency["last_ms"] = g_latency.last_ms;
-    latency["samples"] = g_latency.samples;
+    // latency_json statistics
+    JsonObject latency_json = doc["latency_json"].to<JsonObject>();
+    latency_json["avms"] = latency.samples > 0
+        ? (static_cast<float>(latency.total_ms) / latency.samples) : 0.0f;
+    latency_json["min_ms"] = latency.min_ms == UINT32_MAX ? 0 : latency.min_ms;
+    latency_json["max_ms"] = latency.max_ms;
+    latency_json["last_ms"] = latency.last_ms;
+    latency_json["samples"] = latency.samples;
 
     // Energy consumption
-    doc["energy_mah"] = g_energy.total_mah;
+    doc["energy_mah"] = energy.total_mah;
 
     // WiFi signal
-    if (g_wifi_connected) {
+    if (wifi_connected) {
         doc["wifi_rssi"] = WiFi.RSSI();
     }
 
@@ -179,9 +179,9 @@ String build_gateway_stats_json() {
 
 void check_wifi_connection() {
   #ifdef WIFI_ON
-  if (!WiFi.isConnected() && g_wifi_connected) {
+  if (!WiFi.isConnected() && wifi_connected) {
       print_log("WiFi disconnected, trying to connect again...");
-      g_wifi_connected = false;
+      wifi_connected = false;
       init_wifi();
   }
   #endif
@@ -189,7 +189,7 @@ void check_wifi_connection() {
 
 int get_current_wifi_rssi() {
 #ifdef WIFI_ON
-    if (g_wifi_connected) {
+    if (wifi_connected) {
         return WiFi.RSSI();
     } else {
         return 0;
