@@ -2,7 +2,7 @@
 #include "constants.h"
 #include "utils.h"
 #include "processing.h"
-#include "protocol.h"
+#include "message_struct.h"
 #include "lora.h"
 #include "energy_manager.h"
 #include <ArduinoJson.h>

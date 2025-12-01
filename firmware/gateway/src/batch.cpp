@@ -1,6 +1,6 @@
 #include "batch.h"
 #include "utils.h"
-#include "protocol.h"
+#include "message_struct.h"
 #include "wifi.h"
 #include <ArduinoJson.h>
 

@@ -4,7 +4,7 @@
 #include <sys/time.h>
 
 #include "constants.h"
-#include "protocol.h"
+#include "message_struct.h"
 #include "lora.h"
 #include "wifi.h"
 #include "batch.h"

@@ -1,5 +1,5 @@
-#ifndef PROTOCOL_H
-#define PROTOCOL_H
+#ifndef MESSAGE_STRUCT_H
+#define MESSAGE_STRUCT_H
 
 #include <stdint.h>
 #include <stddef.h>
@@ -64,5 +64,5 @@ struct __attribute__((packed)) AlertMessage {
     uint8_t     checksum;       // XOR checksum
 };
 
-#endif // PROTOCOL_H
+#endif // MESSAGE_STRUCT_H
 

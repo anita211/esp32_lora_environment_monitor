@@ -3,7 +3,7 @@
 
 #include <RadioLib.h>
 #include "constants.h"
-#include "protocol.h"
+#include "message_struct.h"
 
 class LoRaRadio {
   public:

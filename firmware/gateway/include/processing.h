@@ -2,7 +2,7 @@
 #define PROCESSING_H
 
 #include <Arduino.h>
-#include "protocol.h"
+#include "message_struct.h"
 
 void process_rx_lora_message(
   uint8_t* data,
