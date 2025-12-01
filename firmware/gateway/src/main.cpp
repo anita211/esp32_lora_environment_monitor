@@ -17,7 +17,7 @@
 #include <WiFi.h>
 #endif
 
-static uint32_t last_stats_simul_time = 0;
+static uint32_t last_stats_time = 0;
 
 #ifdef SIMUL_DATA
 static uint32_t last_simul_time = 0;
@@ -28,10 +28,6 @@ static void print_statistics();
 #ifdef SIMUL_DATA
 static void generate_fake_packet();
 #endif
-
-/* ============================================================================
- * SETUP
- * ============================================================================ */
 
 void setup() {
     print_log("Node %d - Setting up...\n", NODE_ID);
@@ -46,7 +42,7 @@ void setup() {
 #endif
 
     print_log("Initialized\n");
-    last_stats_simul_time = millis();
+    last_stats_time = millis();
 }
 
 void loop() {
@@ -68,10 +64,10 @@ void loop() {
     }
 #endif
 
-    if (millis() - last_stats_simul_time >= STATS_PERIOD_MS) {
+    if (millis() - last_stats_time >= STATS_PERIOD_MS) {
         print_statistics();
         send_gateway_statistics();
-        last_stats_simul_time = millis();
+        last_stats_time = millis();
     }
 
 #ifdef WIFI_ON
