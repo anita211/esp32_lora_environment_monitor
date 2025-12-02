@@ -11,10 +11,10 @@
 #define SERIAL_BAUD_RATE        115200      // Serial port baud rate
 
 #define WIFI_ON
-#define WIFI_SSID               "VIVOFIBRA-5F31"
-#define WIFI_PASSWORD           "FbkfjWiv5A"
+#define WIFI_SSID               "AndroidAP7827"
+#define WIFI_PASSWORD           "senhai123"
 #define WIFI_TIMEOUT_MS         10000
-#define SERVER_HOST             "192.168.15.7"
+#define SERVER_HOST             "10.41.90.35"
 #define SERVER_PORT             8080
 #define SERVER_ENDPOINT_DATA    "/api/sensor-data"
 #define SERVER_ENDPOINT_STATS   "/api/gateway-stats"

@@ -36,11 +36,11 @@ struct __attribute__((packed)) SensorDataMessage {
     uint8_t     msg_type;       // MSG_TYPE_SENSOR_DATA (0x01)
     uint8_t     client_id;      // Node identifier (1-255)
     uint32_t    timestamp;      // Milliseconds since boot
-    int16_t     temperature;    // Temperature * 100 (°C) - from soil moisture sensor
-    uint16_t    humidity;       // Humidity * 100 (%) - soil moisture
-    uint16_t    distance_cm;    // Distance in centimeters
+    int16_t     temperature;    // Temperature * 100 (°C) - from AHT10 sensor
+    uint16_t    humidity;       // Humidity * 100 (%) - from AHT10 sensor
+    uint16_t    distance_cm;    // Distance in centimeters - from VL53L0X sensor
     uint8_t     battery;        // Battery level (0-100%)
-    uint16_t    luminosity_lux; // Luminosity in lux (BH1750 sensor)
+    uint16_t    luminosity_lux; // Luminosity in lux - from BH1750 sensor
     uint8_t     reserved;       // Reserved for future use
     uint8_t     checksum;       // XOR checksum of all preceding bytes
 };

@@ -46,7 +46,7 @@ void loop() {
     
     bool presence_detected = (distance < MAX_DISTANCE_TO_BE_PRESENCE_CM);
 
-    print_log("Moisture %.1f%%, distance %.0fcm, temperature %.1f°C, luminosity %u lux, presence %s\n", 
+    print_log("Humidity %.1f%%, distance %.0fcm, temperature %.1f°C, luminosity %u lux, presence %s\n", 
           humidity, distance, temperature, luminosity, presence_detected ? "detected" : "not detected");
     
     bool should_send = true;

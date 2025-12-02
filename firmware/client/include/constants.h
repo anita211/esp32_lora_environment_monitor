@@ -4,7 +4,7 @@
 #define NODE_ID              23           // Max 255
 
 #define DEBUG
-// #define SIMUL_DATA
+#define SIMUL_DATA
 #define SIMUL_PERIOD_MS         15000
 #define STATS_PERIOD_MS         60000
 
@@ -42,18 +42,11 @@
 
 #define MAX_DISTANCE_TO_BE_PRESENCE_CM 100         // Distance threshold for presence detection
 
-#define PIN_ULTRASONIC_TRIG     1           // Trigger pin
-#define PIN_ULTRASONIC_ECHO     2           // Echo pin
-#define ULTRASONIC_TIMEOUT_US   30000       // Measurement timeout (microseconds)
-
-#define PIN_SOIL_MOISTURE       3           // Analog input pin
-#define SOIL_MOISTURE_SAMPLES   10          // Number of readings to average
-#define SOIL_ADC_DRY            4095        // ADC value when sensor is dry
-#define SOIL_ADC_WET            1500        // ADC value when sensor is wet
-
 #define PIN_I2C_SDA             4           // I2C Data pin
 #define PIN_I2C_SCL             5           // I2C Clock pin
-#define BH1750_I2C_ADDRESS      0x23        // BH1750 default I2C address
+#define BH1750_I2C_ADDRESS      0x23        // BH1750 default I2C address (0x23 or 0x5C)
+#define VL53L0X_I2C_ADDRESS     0x29        // VL53L0X default I2C address
+#define AHT10_I2C_ADDRESS       0x38        // AHT10 default I2C address
 
 #define SIM_HUMIDITY_BASE       55.0        // Base humidity value (%)
 #define SIM_HUMIDITY_VARIATION  35.0        // +/- variation range

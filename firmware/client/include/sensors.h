@@ -3,6 +3,8 @@
 
 #include <Arduino.h>
 #include <BH1750.h>
+#include <VL53L0X.h>
+#include <Adafruit_AHTX0.h>
 
 class Sensors {
   public:
@@ -20,11 +22,18 @@ class Sensors {
     static Sensors* instance;
     
     BH1750 lux_sensor;
+    VL53L0X distance_sensor;
+    Adafruit_AHTX0 aht;
     float prev_humidity;
     float prev_distance;
     
-    float read_soil_moisture();
-    float read_ultrasonic_distance();
+    // Sensor initialization status flags
+    bool bh1750_initialized;
+    bool vl53l0x_initialized;
+    bool aht10_initialized;
+    
+    float read_humidity();
+    float read_distance();
     float read_temperature();
     uint16_t read_luminosity();
     float generate_simulated_value(float base_value, float variation);
