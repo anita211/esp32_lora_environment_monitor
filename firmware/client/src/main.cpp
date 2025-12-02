@@ -39,8 +39,7 @@ void setup() {
     }
 }
 
-void loop()
-{
+void loop() {
     float humidity, distance, temperature;
     uint16_t luminosity;
     Sensors::get_instance().read_all(humidity, distance, temperature, luminosity);
@@ -80,8 +79,7 @@ void loop()
 #endif
 }
 
-static bool should_transmit(float humidity, float distance)
-{
+static bool should_transmit(float humidity, float distance) {
     if (boot_count == 1) {
         return true;
     }
@@ -101,8 +99,8 @@ static bool should_transmit(float humidity, float distance)
     return false;
 }
 
-static bool transmit_sensor_data(float humidity, float distance, float temperature, uint16_t luminosity)
-{
+static bool transmit_sensor_data(float humidity, float distance, float temperature, uint16_t luminosity) {
+
     SensorDataMessage msg;
     msg.msg_type      = MSG_TYPE_SENSOR_DATA;
     msg.client_id     = NODE_ID;
