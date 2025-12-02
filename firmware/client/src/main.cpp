@@ -18,15 +18,16 @@
 #include <Wire.h>
 #include <BH1750.h>
 #include <math.h>
-#include "config.h"
-#include "protocol.h"
+#include "constants.h"
+#include "message_struct.h"
+#include "utils.h"
 
 /* ============================================================================
  * GLOBAL STATE
  * ============================================================================ */
 
 // LoRa radio instance
-static SX1262 g_radio = new Module(PIN_LORA_NSS, PIN_LORA_DIO1, PIN_LORA_RST, PIN_LORA_BUSY);
+static SX1262 g_radio = new Module(LORA_PIN_CS, LORA_PIN_IRQ, LORA_PIN_RST, LORA_PIN_GPIO_INT);
 
 // BH1750 luminosity sensor instance
 static BH1750 g_lux_sensor(BH1750_I2C_ADDRESS);
@@ -83,12 +84,12 @@ void setup()
 {
     g_boot_count++;
 
-#if DEBUG_ENABLED
+#ifdef DEBUG
     Serial.begin(SERIAL_BAUD_RATE);
     delay(500);
-    LOG_F("\n========================================\n");
-    LOG_F("[NODE %d] Boot #%u\n", NODE_ID, g_boot_count);
-    LOG_F("========================================\n");
+    print_log("\n========================================\n");
+    print_log("[NODE %d] Boot #%u\n", NODE_ID, g_boot_count);
+    print_log("========================================\n");
 #endif
 
     init_lora_radio();
@@ -113,10 +114,12 @@ void loop()
     uint16_t luminosity;
     read_all_sensors(humidity, distance, temperature, luminosity);
     
-    bool presence_detected = (distance < PRESENCE_DISTANCE_CM);
+    bool presence_detected = (distance < MAX_DISTANCE_TO_BE_PRESENCE_CM);
 
-    LOG_F("[SENSORS] Moisture=%.1f%%, Distance=%.0fcm, Temp=%.1f°C, Lux=%u, Presence=%s\n", 
+#ifdef DEBUG
+    print_log("[SENSORS] Moisture=%.1f%%, Distance=%.0fcm, Temp=%.1f°C, Lux=%u, Presence=%s\n", 
           humidity, distance, temperature, luminosity, presence_detected ? "YES" : "No");
+#endif
 
     // Decide whether to transmit
     bool should_send = true;
@@ -124,7 +127,9 @@ void loop()
 #if ADAPTIVE_TX_ENABLED
     should_send = should_transmit(humidity, distance);
     if (!should_send) {
-        LOG_LN("[TX] Skipped - values unchanged");
+#ifdef DEBUG
+        print_log("[TX] Skipped - values unchanged\n");
+#endif
         g_tx_stats.skipped++;
     }
 #endif
@@ -142,14 +147,16 @@ void loop()
 
     g_tx_stats.total++;
 
-#if DEBUG_ENABLED
+#ifdef DEBUG
     print_statistics();
 #endif
 
     // Sleep or delay until next cycle
 #if DEEP_SLEEP_ENABLED
-    LOG_F("[POWER] Entering deep sleep for %d seconds\n", TX_INTERVAL_MS / 1000);
-    delay(50);  // Allow serial output to complete
+#ifdef DEBUG
+    print_log("[POWER] Entering deep sleep for %d seconds\n", TX_INTERVAL_MS / 1000);
+#endif
+    delay(50);
     enter_deep_sleep();
 #else
     delay(TX_INTERVAL_MS);
@@ -162,18 +169,20 @@ void loop()
 
 static void init_lora_radio()
 {
-    LOG_F("[LORA] Initializing: %.1f MHz, SF%d, %d dBm\n", 
-          LORA_FREQUENCY_MHZ, LORA_SPREADING_FACTOR, LORA_TX_POWER_DBM);
+#ifdef DEBUG
+    print_log("[LORA] Initializing: %.1f MHz, SF%d, %d dBm\n", 
+          LORA_FREQUENCY_MHZ, LORA_SPREADING_FACTOR, LORA_TX_POWER);
+#endif
 
     // Hardware reset
-    pinMode(PIN_LORA_RST, OUTPUT);
-    digitalWrite(PIN_LORA_RST, LOW);
+    pinMode(LORA_PIN_RST, OUTPUT);
+    digitalWrite(LORA_PIN_RST, LOW);
     delay(10);
-    digitalWrite(PIN_LORA_RST, HIGH);
+    digitalWrite(LORA_PIN_RST, HIGH);
     delay(10);
 
     // Initialize SPI
-    SPI.begin(PIN_LORA_SCK, PIN_LORA_MISO, PIN_LORA_MOSI, PIN_LORA_NSS);
+    SPI.begin(LORA_PIN_SCK, LORA_PIN_MISO, LORA_PIN_MOSI, LORA_PIN_CS);
     SPI.setFrequency(2000000);
     delay(100);
 
@@ -184,17 +193,21 @@ static void init_lora_radio()
         LORA_SPREADING_FACTOR,
         LORA_CODING_RATE,
         LORA_SYNC_WORD,
-        LORA_TX_POWER_DBM,
+        LORA_TX_POWER,
         LORA_PREAMBLE_LENGTH
     );
 
     if (result == RADIOLIB_ERR_NONE) {
         g_lora_ready = true;
         g_radio.setCurrentLimit(140);
-        LOG_LN("[LORA] Initialized successfully");
+#ifdef DEBUG
+        print_log("[LORA] Initialized successfully\n");
+#endif
     } else {
         g_lora_ready = false;
-        LOG_F("[LORA] FAILED to initialize (error %d)\n", result);
+#ifdef DEBUG
+        print_log("[LORA] FAILED to initialize (error %d)\n", result);
+#endif
     }
 }
 
@@ -219,14 +232,22 @@ static void init_sensors()
     
     // Initialize BH1750 luminosity sensor
     if (g_lux_sensor.begin(BH1750::CONTINUOUS_HIGH_RES_MODE)) {
-        LOG_LN("[SENSORS] BH1750 luminosity sensor initialized");
+#ifdef DEBUG
+        print_log("[SENSORS] BH1750 luminosity sensor initialized\n");
+#endif
     } else {
-        LOG_LN("[SENSORS] WARNING: BH1750 initialization failed!");
+#ifdef DEBUG
+        print_log("[SENSORS] WARNING: BH1750 initialization failed!\n");
+#endif
     }
     
-    LOG_LN("[SENSORS] Hardware sensors initialized");
+#ifdef DEBUG
+    print_log("[SENSORS] Hardware sensors initialized\n");
+#endif
 #else
-    LOG_LN("[SENSORS] Running in SIMULATION mode");
+#ifdef DEBUG
+    print_log("[SENSORS] Running in SIMULATION mode\n");
+#endif
 #endif
 }
 
@@ -306,7 +327,9 @@ static uint16_t read_luminosity()
 #if REAL_SENSORS_ENABLED
     float lux = g_lux_sensor.readLightLevel();
     if (lux < 0) {
-        LOG_LN("[SENSORS] BH1750 read error, returning 0");
+#ifdef DEBUG
+        print_log("[SENSORS] BH1750 read error, returning 0\n");
+#endif
         return 0;
     }
     return static_cast<uint16_t>(constrain(lux, 0.0f, 65535.0f));
@@ -369,7 +392,9 @@ static bool should_transmit(float humidity, float distance)
 static bool transmit_sensor_data(float humidity, float distance, float temperature, uint16_t luminosity)
 {
     if (!g_lora_ready) {
-        LOG_LN("[TX] ERROR: LoRa radio not initialized");
+#ifdef DEBUG
+        print_log("[TX] ERROR: LoRa radio not initialized\n");
+#endif
         return false;
     }
 
@@ -391,15 +416,19 @@ static bool transmit_sensor_data(float humidity, float distance, float temperatu
         int result = g_radio.transmit(reinterpret_cast<uint8_t*>(&msg), sizeof(msg));
         
         if (result == RADIOLIB_ERR_NONE) {
-            LOG_LN("[TX] Transmission successful");
+#ifdef DEBUG
+            print_log("[TX] Transmission successful\n");
+#endif
             return true;
         }
-        
-        LOG_F("[TX] Attempt %d failed (error %d)\n", attempt, result);
+#ifdef DEBUG
+        print_log("[TX] Attempt %d failed (error %d)\n", attempt, result);
+#endif
         delay(100);
     }
-
-    LOG_LN("[TX] All retry attempts failed");
+#ifdef DEBUG
+    print_log("[TX] All retry attempts failed\n");
+#endif
     return false;
 }
 
@@ -419,12 +448,14 @@ static void enter_deep_sleep()
 
 static void print_statistics()
 {
+#ifdef DEBUG
     if (g_tx_stats.total > 0) {
         float success_rate = (static_cast<float>(g_tx_stats.success) / g_tx_stats.total) * 100.0f;
-        LOG_F("[STATS] Total=%u, Success=%u, Failed=%u, Skipped=%u (%.0f%% success)\n",
+        print_log("[STATS] Total=%u, Success=%u, Failed=%u, Skipped=%u (%.0f%% success)\n",
               g_tx_stats.total, g_tx_stats.success, g_tx_stats.failed, 
               g_tx_stats.skipped, success_rate);
     }
+#endif
 }
 
 /* ============================================================================
