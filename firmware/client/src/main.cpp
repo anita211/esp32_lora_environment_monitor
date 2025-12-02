@@ -19,8 +19,7 @@ static void enter_deep_sleep();
 
 static void print_statistics();
 
-void setup()
-{
+void setup() {
     boot_count++;
     delay(10000);
 
@@ -119,14 +118,12 @@ static bool transmit_sensor_data(float humidity, float distance, float temperatu
     return LoRaRadio::get_instance().transmit(reinterpret_cast<uint8_t*>(&msg), sizeof(msg));
 }
 
-static void enter_deep_sleep()
-{
+static void enter_deep_sleep() {
     esp_sleep_enable_timer_wakeup(DEEP_SLEEP_TIME_US);
     esp_deep_sleep_start();
 }
 
-static void print_statistics()
-{
+static void print_statistics() {
     LoRaRadio::Stats lora_stats = LoRaRadio::get_instance().get_stats();
     
     if (lora_stats.total_tx_packets > 0) {
