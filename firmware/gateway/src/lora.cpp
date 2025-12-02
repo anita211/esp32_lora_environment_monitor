@@ -53,11 +53,12 @@ void LoRaRadio::setup() {
 }
 
 void LoRaRadio::check_packets() {
-    if (lora_handler.getPacketLength() > 0) {
+    int packet_size = lora_handler.getPacketLength();
+    
+    if (packet_size > 0) {
         int state = lora_handler.readData(packet_rx_buffer, LORA_MAX_PACKET_SIZE);
 
         if (state == RADIOLIB_ERR_NONE) {
-          size_t length = lora_handler.getPacketLength();
           float rssi = lora_handler.getRSSI();
           float snr = lora_handler.getSNR();
 
@@ -67,17 +68,18 @@ void LoRaRadio::check_packets() {
           print_log(
             "Received packet - #%u: %d bytes | RSSI=%.0f dBm | SNR=%.1f dB\n",
             stats.total_rx_packets,
-            length,
+            packet_size,
             rssi,
             snr
           );
 
-          process_rx_lora_message(packet_rx_buffer, length, rssi, snr);
+          process_rx_lora_message(packet_rx_buffer, packet_size, rssi, snr);
         } else if (state == RADIOLIB_ERR_CRC_MISMATCH) {
           print_log("Lora packet RX CRC error - packet discarded\n");
           stats.total_rx_invalids++;
         }
 
+        // Limpa o buffer e reinicia recepção para o próximo pacote
         lora_handler.startReceive();
     }
 }

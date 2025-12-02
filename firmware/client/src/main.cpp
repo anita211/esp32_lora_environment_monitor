@@ -20,10 +20,33 @@ static void enter_deep_sleep();
 static void print_statistics();
 
 void setup() {
+    Serial.begin(SERIAL_BAUD_RATE);
+    
+    // Wait for USB CDC to be ready (important for ESP32-S3)
+    unsigned long start = millis();
+    while (!Serial && (millis() - start) < 3000) {
+        delay(10);
+    }
+    delay(500);  // Extra delay for stability
+    
     boot_count++;
-    delay(10000);
-
-    print_log("\nNode %d initializing, boot #%u\n", NODE_ID, boot_count);
+    
+    // Check wakeup reason
+    esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+    
+    print_log("\n========================================\n");
+    print_log("Node %d initializing, boot #%u\n", NODE_ID, boot_count);
+    
+    switch(wakeup_reason) {
+        case ESP_SLEEP_WAKEUP_TIMER:
+            print_log("Wakeup caused by timer (from deep sleep)\n");
+            break;
+        case ESP_SLEEP_WAKEUP_UNDEFINED:
+        default:
+            print_log("Wakeup caused by reset or power-on\n");
+            break;
+    }
+    print_log("========================================\n");
 
     LoRaRadio::get_instance().setup();
     Sensors::get_instance().setup();
@@ -117,7 +140,15 @@ static bool transmit_sensor_data(float humidity, float distance, float temperatu
 }
 
 static void enter_deep_sleep() {
+    Serial.flush();  // Ensure all serial data is sent before sleeping
+    delay(100);      // Give time for serial to finish
+    
     esp_sleep_enable_timer_wakeup(DEEP_SLEEP_TIME_US);
+    
+    print_log("Entering deep sleep now...\n");
+    Serial.flush();
+    delay(100);
+    
     esp_deep_sleep_start();
 }
 

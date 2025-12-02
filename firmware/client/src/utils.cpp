@@ -5,10 +5,12 @@
 
 #ifdef DEBUG
 void print_log(const char* format, ...) {
+    char buffer[256];
     va_list args;
     va_start(args, format);
-    vprintf(format, args);
+    vsnprintf(buffer, sizeof(buffer), format, args);
     va_end(args);
+    Serial.print(buffer);
 }
 #else
 void print_log(const char* format, ...) {}

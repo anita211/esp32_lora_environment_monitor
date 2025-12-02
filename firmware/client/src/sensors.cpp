@@ -29,12 +29,40 @@ void Sensors::setup() {
     Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
     delay(100);  // Give I2C time to initialize
     
-    // Initialize BH1750 luminosity sensor
-    bh1750_initialized = lux_sensor.begin(BH1750::CONTINUOUS_HIGH_RES_MODE);
-    if (bh1750_initialized) {
-        print_log("BH1750 luminosity sensor initialized\n");
+    // Scan I2C bus to find connected devices
+    print_log("Scanning I2C bus...\n");
+    byte error, address;
+    int nDevices = 0;
+    bool bh1750_at_0x23 = false;
+    bool bh1750_at_0x5C = false;
+    
+    for(address = 1; address < 127; address++) {
+        Wire.beginTransmission(address);
+        error = Wire.endTransmission();
+        if (error == 0) {
+            print_log("I2C device found at address 0x%02X\n", address);
+            nDevices++;
+            if (address == 0x23) bh1750_at_0x23 = true;
+            if (address == 0x5C) bh1750_at_0x5C = true;
+        }
+    }
+    if (nDevices == 0) {
+        print_log("No I2C devices found! Check wiring.\n");
     } else {
-        print_log("Warning: BH1750 initialization failed - will return empty data\n");
+        print_log("Found %d I2C device(s)\n", nDevices);
+    }
+    
+    // Initialize BH1750 luminosity sensor
+    if (bh1750_at_0x23 || bh1750_at_0x5C) {
+        bh1750_initialized = lux_sensor.begin(BH1750::CONTINUOUS_HIGH_RES_MODE);
+        if (bh1750_initialized) {
+            print_log("BH1750 luminosity sensor initialized\n");
+        } else {
+            print_log("Warning: BH1750 found but initialization failed\n");
+        }
+    } else {
+        print_log("Warning: BH1750 not detected on I2C bus - will return empty data\n");
+        bh1750_initialized = false;
     }
     
     // Initialize VL53L0X distance sensor
@@ -57,7 +85,9 @@ void Sensors::setup() {
     
     print_log("Hardware sensors setup complete\n");
 #else
-    print_log("Running in simulation mode\n");
+    // Initialize random seed for simulation mode using ESP32 hardware RNG
+    randomSeed(esp_random());
+    print_log("Running in simulation mode (random seed initialized)\n");
 #endif
 }
 
@@ -87,7 +117,9 @@ float Sensors::read_humidity() {
         return 0.0f;  // Read error, return empty value
     }
 #else
-    return generate_simulated_value(SIM_HUMIDITY_BASE, SIM_HUMIDITY_VARIATION);
+    float humidity = generate_simulated_value(SIM_HUMIDITY_BASE, SIM_HUMIDITY_VARIATION);
+    print_log("[SIM] Humidity: %.1f%%\n", humidity);
+    return humidity;
 #endif
 }
 
@@ -109,7 +141,9 @@ float Sensors::read_distance() {
     float distance_cm = distance_mm / 10.0f;
     return constrain(distance_cm, 0.0f, 200.0f);  // VL53L0X effective range ~2m
 #else
-    return generate_simulated_value(SIM_DISTANCE_BASE, SIM_DISTANCE_VARIATION);
+    float distance = generate_simulated_value(SIM_DISTANCE_BASE, SIM_DISTANCE_VARIATION);
+    print_log("[SIM] Distance: %.1f cm\n", distance);
+    return distance;
 #endif
 }
 
@@ -127,7 +161,9 @@ float Sensors::read_temperature() {
         return 0.0f;  // Read error, return empty value
     }
 #else
-    return generate_simulated_value(SIM_TEMPERATURE_BASE, SIM_TEMPERATURE_VARIATION);
+    float temperature = generate_simulated_value(SIM_TEMPERATURE_BASE, SIM_TEMPERATURE_VARIATION);
+    print_log("[SIM] Temperature: %.1f C\n", temperature);
+    return temperature;
 #endif
 }
 
@@ -145,12 +181,15 @@ uint16_t Sensors::read_luminosity() {
     return static_cast<uint16_t>(constrain(lux, 0.0f, 65535.0f));
 #else
     float lux = generate_simulated_value(SIM_LUMINOSITY_BASE, SIM_LUMINOSITY_VARIATION);
-    return static_cast<uint16_t>(constrain(lux, 0.0f, 65535.0f));
+    uint16_t lux_value = static_cast<uint16_t>(constrain(lux, 0.0f, 65535.0f));
+    print_log("[SIM] Luminosity: %u lux\n", lux_value);
+    return lux_value;
 #endif
 }
 
 float Sensors::generate_simulated_value(float base_value, float variation) {
-    randomSeed(analogRead(0) + millis());
+    // random() generates pseudo-random values
+    // randomSeed is called once in setup via esp_random for true randomness
     float random_factor = static_cast<float>(random(-1000, 1000)) / 1000.0f;
     return base_value + (random_factor * variation);
 }

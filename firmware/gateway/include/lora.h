@@ -24,7 +24,10 @@ class LoRaRadio {
     static LoRaRadio& get_instance();
     void setup();
     void check_packets();
-    Stats get_stats() const {
+    Stats& get_stats() {
+        return stats;
+    }
+    const Stats& get_stats() const {
         return stats;
     }
     uint32_t get_last_rx_time_ms() const {

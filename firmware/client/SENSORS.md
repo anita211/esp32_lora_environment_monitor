@@ -4,73 +4,22 @@
 
 **Quick Reference:**
 
-| Sensor | Sensor Pin | ESP32-S3 Pin | GPIO | Voltage |
-|--------|------------|--------------|------|---------|
-| HC-SR04 | VCC | 5V | - | 5V |
-| HC-SR04 | TRIG | D0 | GPIO1 | 3.3V |
-| HC-SR04 | ECHO | D1 | GPIO2 | 5V→3.3V ⚠️ |
-| HC-SR04 | GND | GND | - | - |
-| MH-RD | VCC | 3.3V | - | 3.3V ✓ |
-| MH-RD | AO | A2 | GPIO3 | 3.3V |
-| MH-RD | GND | GND | - | - |
-| BH1750 | VCC | 3.3V | - | 3.3V ✓ |
-| BH1750 | SDA | D3 | GPIO4 | 3.3V |
-| BH1750 | SCL | D4 | GPIO5 | 3.3V |
-| BH1750 | GND | GND | - | - |
+| Sensor  | Sensor Pin | ESP32-S3 Pin | GPIO  | Voltage |
+| ------- | ---------- | ------------ | ----- | ------- |
+| BH1750  | VCC        | 3.3V         | -     | 3.3V ✓  |
+| BH1750  | SDA        | D3           | GPIO4 | 3.3V    |
+| BH1750  | SCL        | D4           | GPIO5 | 3.3V    |
+| BH1750  | GND        | GND          | -     | -       |
+| VL53L0X | VCC        | 3.3V         | -     | 3.3V ✓  |
+| VL53L0X | SDA        | D3           | GPIO4 | 3.3V    |
+| VL53L0X | SCL        | D4           | GPIO5 | 3.3V    |
+| VL53L0X | GND        | GND          | -     | -       |
+| AHT10   | VCC        | 3.3V         | -     | 3.3V ✓  |
+| AHT10   | SDA        | D3           | GPIO4 | 3.3V    |
+| AHT10   | SCL        | D4           | GPIO5 | 3.3V    |
+| AHT10   | GND        | GND          | -     | -       |
 
-### 1️⃣ **HC-SR04 (Ultrasonic Distance Sensor)**
-
-```
-HC-SR04          XIAO ESP32-S3
-┌────────────┐   ┌────────────┐
-│    VCC     │───│    5V      │
-│    TRIG    │───│ D0 (GPIO1) │
-│    ECHO    │───│ D1 (GPIO2) │ ⚠️ Use voltage divider!
-│    GND     │───│    GND     │
-└────────────┘   └────────────┘
-```
-
-**⚠️ IMPORTANT - Voltage Divider for ECHO:**
-The HC-SR04 outputs 5V on the ECHO pin, but ESP32-S3 only accepts 3.3V!
-
-**Option 1: Voltage Divider (Recommended)**
-```
-ECHO (5V) ──[ R1: 1kΩ ]──┬── D1 (GPIO2)
-                          │
-                     [ R2: 2kΩ ]
-                          │
-                         GND
-
-Voltage at GPIO2 = 5V × (2kΩ / 3kΩ) = 3.33V ✓
-```
-
-**Option 2: Logic Level Converter (Safer)**
-- Use a bidirectional 5V ↔ 3.3V level converter module
-
----
-
-### 2️⃣ **MH-RD (Soil Moisture Sensor)**
-
-```
-MH-RD Module     XIAO ESP32-S3
-┌────────────┐   ┌────────────┐
-│    VCC     │───│   3.3V     │ ✓ Works with 3.3V
-│    GND     │───│    GND     │
-│ AO (Analog)│───│ A2 (GPIO3) │ ← ADC Pin
-│ DO (Digital)│   │ (not used) │
-└────────────┘   └────────────┘
-```
-
-**Notes:**
-- ✓ **VCC at 3.3V** - This sensor works with 3.3V!
-- Use only the **AO (Analog Out)** output
-- The DO (Digital) output is not needed
-- The sensor works **inverted**: lower ADC value = wetter soil
-- Pin A2 (GPIO3) does not conflict with HC-SR04
-
----
-
-### 3️⃣ **BH1750 (Luminosity Sensor)**
+### 1️⃣ **BH1750 (Luminosity Sensor)**
 
 ```
 BH1750 Module    XIAO ESP32-S3
@@ -84,12 +33,15 @@ BH1750 Module    XIAO ESP32-S3
 ```
 
 **Notes:**
+
 - ✓ **3.3V compatible** - Works natively with ESP32
 - **I2C Address:** 0x23 (default, ADDR→GND) or 0x5C (ADDR→VCC)
 - Measurement range: 1 - 65535 lux
 - Automatically adjusts measurement time based on light level
+- High resolution mode: 1 lux resolution
 
-**I2C Configuration in `config.h`:**
+**I2C Configuration in `constants.h`:**
+
 ```cpp
 #define PIN_I2C_SDA        4           // GPIO4 / D3
 #define PIN_I2C_SCL        5           // GPIO5 / D4
@@ -98,163 +50,124 @@ BH1750 Module    XIAO ESP32-S3
 
 ---
 
-## 🔧 MH-RD Sensor Calibration
+### 2️⃣ **VL53L0X / VL53L1X (ToF Distance Sensor)**
 
-The MH-RD sensor needs to be **calibrated** for your specific soil!
-
-### Step 1: Measure "Dry" Value
-```cpp
-// In the code, temporarily:
-#define SOIL_ADC_DRY 4095  // Start with this value
+```
+VL53L0X Module   XIAO ESP32-S3
+┌────────────┐   ┌────────────┐
+│    VCC     │───│   3.3V     │ ✓
+│    GND     │───│    GND     │
+│    SDA     │───│ D3 (GPIO4) │ ← I2C Data
+│    SCL     │───│ D4 (GPIO5) │ ← I2C Clock
+│   XSHUT    │───│ (optional) │ ← Shutdown (not used)
+│   GPIO1    │───│ (optional) │ ← Interrupt (not used)
+└────────────┘   └────────────┘
 ```
 
-1. Leave the sensor **completely dry** in open air for 30 minutes
-2. Compile and run the code
-3. Note the ADC value shown in Serial Monitor
-4. Update `SOIL_ADC_DRY` with this value
+**Notes:**
 
-### Step 2: Measure "Wet" Value
-```cpp
-// In the code:
-#define SOIL_ADC_WET 1500  // Adjust this value
-```
+- ✓ **3.3V compatible** - Works natively with ESP32
+- **I2C Address:** 0x29 (default)
+- **Technology:** Time-of-Flight (ToF) laser ranging
+- **Range:** 30mm to 2000mm (VL53L0X) or up to 4000mm (VL53L1X)
+- **Accuracy:** ±3% at typical distances
+- Ambient light independent
+- Fast measurement: up to 50Hz
 
-1. Place the sensor in **very wet soil** or water
-2. Note the ADC value shown
-3. Update `SOIL_ADC_WET` with this value
+**VL53L0X vs VL53L1X:**
 
-### Real Example:
-```
-Sensor in air (dry):     ADC = 4095  → 0% moisture
-Sensor in water:         ADC = 800   → 100% moisture
-Sensor in moist soil:    ADC = 1500  → ~60% moisture
-```
-
-**Update in `config.h`:**
-```cpp
-#define SOIL_ADC_DRY 4095   // Your dry value
-#define SOIL_ADC_WET 800    // Your wet value
-```
+- VL53L0X: Max range ~2m, good for most applications
+- VL53L1X: Max range ~4m, better ambient light immunity
 
 ---
 
-## ⚙️ Code Configuration
+### 3️⃣ **AHT10 (Temperature & Humidity Sensor)**
 
-### To Use Real Sensors:
-In the `include/config.h` file, make sure:
-```cpp
-#define REAL_SENSORS_ENABLED true  // ← true for real sensors
+```
+AHT10 Module     XIAO ESP32-S3
+┌────────────┐   ┌────────────┐
+│    VCC     │───│   3.3V     │ ✓
+│    GND     │───│    GND     │
+│    SDA     │───│ D3 (GPIO4) │ ← I2C Data
+│    SCL     │───│ D4 (GPIO5) │ ← I2C Clock
+└────────────┘   └────────────┘
 ```
 
-### To Return to Simulation (Testing):
-```cpp
-#define REAL_SENSORS_ENABLED false  // ← false for simulation
-```
+**Notes:**
+
+- ✓ **3.3V compatible** - Works natively with ESP32
+- **I2C Address:** 0x38 (fixed)
+- **Temperature Range:** -40°C to +85°C
+- **Temperature Accuracy:** ±0.3°C (typical)
+- **Humidity Range:** 0% to 100% RH
+- **Humidity Accuracy:** ±2% RH (typical)
+- Low power consumption
+- Fast response time
 
 ---
 
-## 🧪 Testing the Sensors
+## 🧪 I2C Bus Wiring
 
-### 1. Compile and Upload:
-```bash
-cd firmware/client
-platformio run --target upload
-platformio device monitor
+All three sensors share the same I2C bus:
+
+```
+ESP32-S3 GPIO4 (SDA) ───┬─── BH1750 SDA
+                        ├─── VL53L0X SDA
+                        └─── AHT10 SDA
+
+ESP32-S3 GPIO5 (SCL) ───┬─── BH1750 SCL
+                        ├─── VL53L0X SCL
+                        └─── AHT10 SCL
+
+3.3V ───────────────────┬─── BH1750 VCC
+                        ├─── VL53L0X VCC
+                        └─── AHT10 VCC
+
+GND ────────────────────┬─── BH1750 GND
+                        ├─── VL53L0X GND
+                        └─── AHT10 GND
 ```
 
-### 2. Check Serial Monitor Output:
+**I2C Addresses:**
 
-**Initialization:**
-```
-Initializing sensors...
-✓ HC-SR04 initialized (TRIG: GPIO1, ECHO: GPIO2)
-✓ MH-RD Moisture sensor initialized (ADC: GPIO3)
-✓ BH1750 luminosity sensor initialized (I2C: 0x23)
-Test readings: Moisture=45.2%, Distance=125.3cm, Lux=850
-Sensors ready
-```
+- BH1750: 0x23 (or 0x5C if ADDR connected to VCC)
+- VL53L0X: 0x29 (default)
+- AHT10: 0x38 (fixed)
 
-**During Operation:**
-```
---- Measurement Cycle ---
-[SENSORS] MH-RD ADC: 2850, Humidity: 52.3%
-[SENSORS] HC-SR04: 85.2 cm
-[SENSORS] BH1750: 1250 lux
-Moisture: 52.30 %
-Distance: 85.20 cm
-Luminosity: 1250 lux
-Presence: DETECTED  ← Object < 100cm detected!
-```
+**Notes:**
+
+- ✓ No address conflicts - all sensors have different I2C addresses
+- ✓ All sensors are 3.3V compatible
+- ✓ No pull-up resistors needed (usually built-in on modules)
+- If you have I2C communication issues, add external 4.7kΩ pull-ups on SDA and SCL
 
 ---
 
-## 🐛 Troubleshooting
+## 🔧 No Calibration Required!
 
-### HC-SR04 Always Returns 400cm (Out of Range)
-✅ **Solutions:**
-- Check TRIG and ECHO connections
-- Use voltage divider on ECHO pin
-- Ensure sensor has 5V power supply
-- Test with an object ~30cm from the sensor
+Unlike analog sensors, all three I2C sensors are **factory calibrated**:
 
-### MH-RD Always Shows 0% or 100%
-✅ **Solutions:**
-- Recalibrate DRY and WET values
-- Verify ADC pin is correct (A2 = GPIO3)
-- Test with sensor at different moisture levels
+- **BH1750**: Calibrated light sensor, direct lux readout
 
-### "Out of range" on HC-SR04
-✅ **Cause:** No object detected within 4 meters
-- Place a solid object ~50cm from the sensor
+### VL53L0X Distance Sensor
 
-### Unstable Readings
-✅ **Solutions:**
-- Increase `SOIL_MOISTURE_SAMPLES` to 20 (slower but more stable)
-- Use short, shielded wires
-- Add 100µF capacitor between sensor VCC and GND
+| Distance  | Presence       | Use Case              |
+| --------- | -------------- | --------------------- |
+| < 50cm    | ✓ Detected     | Object very close     |
+| 50-100cm  | ✓ Detected     | Within threshold      |
+| 100-200cm | ✗ Not detected | Outside threshold     |
+| > 200cm   | ✗ Not detected | Far away or no object |
 
-### BH1750 Not Detected
-✅ **Solutions:**
-- Check I2C wiring (SDA → GPIO4, SCL → GPIO5)
-- Verify I2C address (0x23 with ADDR→GND, 0x5C with ADDR→VCC)
-- Use I2C scanner sketch to find device
-- Ensure 3.3V power supply
+### BH1750 Luminosity Sensor
 
-### BH1750 Shows 0 or -1 lux
-✅ **Solutions:**
-- Sensor may be in very dark environment (normal if < 1 lux)
-- Check if sensor is initialized correctly in Serial Monitor
-- Verify I2C pull-up resistors (usually built into module)
-
----
-
-## 📊 Data Interpretation
-
-### Soil Moisture Sensor (MH-RD)
-| ADC Value | Moisture % | Condition |
-|-----------|------------|-----------|
-| 4095 | 0% | Dry (air) |
-| 3000-3500 | 20-40% | Dry soil |
-| 2000-2500 | 50-70% | Moist soil |
-| 800-1500 | 80-100% | Wet soil |
-
-### Ultrasonic Sensor (HC-SR04)
-| Distance | Presence | Use Case |
-|----------|----------|----------|
-| < 50cm | ✓ Detected | Object very close |
-| 50-100cm | ✓ Detected | Within threshold |
-| 100-200cm | ✗ Not detected | Outside threshold |
-| > 200cm | ✗ Not detected | Far away or no object |
-
-### Luminosity Sensor (BH1750)
-| Lux Value | Condition | Environment |
-|-----------|-----------|-------------|
-| 0-50 | Very dark | Night, closed room |
-| 50-200 | Dim | Indoor, cloudy day |
-| 200-1000 | Normal indoor | Office, home |
-| 1000-10000 | Bright | Near window, shade |
-| 10000-50000 | Very bright | Direct sunlight |
-| > 50000 | Extremely bright | Full sun exposure |
+| Lux Value   | Condition        | Environment        |
+| ----------- | ---------------- | ------------------ |
+| 0-50        | Very dark        | Night, closed room |
+| 50-200      | Dim              | Indoor, cloudy day |
+| 200-1000    | Normal indoor    | Office, home       |
+| 1000-10000  | Bright           | Near window, shade |
+| 10000-50000 | Very bright      | Direct sunlight    |
+| > 50000     | Extremely bright | Full sun exposure  |
 
 ---
 
@@ -262,37 +175,139 @@ Presence: DETECTED  ← Object < 100cm detected!
 
 **Active Mode (with sensors):**
 - ESP32-S3: ~240mA
-- HC-SR04: ~15mA (during measurement, 2ms)
-- MH-RD: ~5mA
+- VL53L0X: ~19mA (during measurement)
+- AHT10: ~0.55mA (during measurement)
 - BH1750: ~0.12mA (measurement), ~0.01mA (sleep)
 - **Total: ~260mA for ~3 seconds**
 
 **Deep Sleep Mode:**
 - ESP32-S3: ~10µA
-- Sensors automatically powered off
+- Sensors automatically powered off via I2C disable
 - **Battery life: weeks to months**
 
 ---
 
 ## 📝 Checklist Before Powering On
 
-- [ ] HC-SR04 has **voltage divider** on ECHO
-- [ ] MH-RD connected to A2 pin (GPIO3)
-- [ ] BH1750 connected via I2C (SDA→GPIO4, SCL→GPIO5)
-- [ ] HC-SR04 powered with **5V**
-- [ ] MH-RD and BH1750 powered with **3.3V**
-- [ ] `REAL_SENSORS_ENABLED` = `true` in config.h
-- [ ] DRY and WET values calibrated for soil moisture
+- [ ] All sensors connected via I2C (SDA→GPIO4, SCL→GPIO5)
+- [ ] All sensors powered with **3.3V**
+- [ ] Common GND connection
+- [ ] `REAL_SENSORS_ENABLED` = `true` in constants.h
+- [ ] Libraries installed via PlatformIO
 - [ ] Serial Monitor open for debugging
 
 ---
 
 ## 🎯 Next Steps
 
-1. **Individual Test:** Test each sensor separately first
-2. **Calibration:** Calibrate the MH-RD for your soil
-3. **Integration:** Test both sensors together
-4. **Deep Sleep:** Enable deep sleep after confirming everything works
-5. **Deploy:** Put into production!
+1. **Install Libraries:** PlatformIO will auto-install on first build
+2. **Individual Test:** Verify each sensor I2C address with scanner
+3. **Integration:** Test all sensors together
+4. **Deploy:** Set REAL_SENSORS_ENABLED=true and upload
 
-Good luck! 🚀
+**Happy sensing! 🎉**
+- Ensure target is between 3cm and 200cm
+- Check that sensor lens is clean
+- Avoid highly reflective or transparent surfaces
+- Ensure sensor is stable and not moving
+
+### AHT10 Returns Error Values
+✅ **Solutions:**
+- Wait 500ms after power-up before first reading
+- Ensure sensor is not exposed to condensation
+- Check I2C communication with other sensors first
+- Try power cycling the sensor
+
+### BH1750 Returns 0 or 65535 lux
+✅ **Solutions:**
+- Very dark: < 1 lux may read as 0 (normal)
+- Very bright: > 65535 lux will saturate (normal in direct sunlight)
+- Check sensor orientation (light sensor facing up)
+- Verify I2C communication
+
+### Unstable Readings
+✅ **Solutions:**
+- Use short, shielded I2C wires (< 20cm recommended)
+- Add 100µF capacitor between sensor VCC and GND
+- Reduce I2C clock speed if necessary
+- Ensure stable power supply
+
+---
+
+## 📊 Data Interpretation
+
+### AHT10 Temperature & Humidity
+
+| Temperature | Condition |
+|------------|-----------|
+| < 10°C | Cold |
+| 10-20°C | Cool |
+| 20-25°C | Comfortable |
+| 25-30°C | Warm |
+| > 30°C | Hot |
+
+| Humidity | Condition |
+|----------|-----------|
+| < 30% | Very dry |
+| 30-40% | Dry |
+| 40-60% | Comfortable |
+| 60-80% | Humid |
+| > 80% | Very humid |
+
+### VL53L0X Distance Sensor
+
+| Distance  | Presence       | Use Case              |
+| --------- | -------------- | --------------------- |
+| < 50cm    | ✓ Detected     | Object very close     |
+| 50-100cm  | ✓ Detected     | Within threshold      |
+| 100-200cm | ✗ Not detected | Outside threshold     |
+| > 200cm   | ✗ Not detected | Far away or no object |
+
+### BH1750 Luminosity Sensor
+
+| Lux Value   | Condition        | Environment        |
+| ----------- | ---------------- | ------------------ |
+| 0-50        | Very dark        | Night, closed room |
+| 50-200      | Dim              | Indoor, cloudy day |
+| 200-1000    | Normal indoor    | Office, home       |
+| 1000-10000  | Bright           | Near window, shade |
+| 10000-50000 | Very bright      | Direct sunlight    |
+| > 50000     | Extremely bright | Full sun exposure  |
+
+---
+
+## 🔋 Power Consumption
+
+**Active Mode (with sensors):**
+- ESP32-S3: ~240mA
+- VL53L0X: ~19mA (during measurement)
+- AHT10: ~0.55mA (during measurement)
+- BH1750: ~0.12mA (measurement), ~0.01mA (sleep)
+- **Total: ~260mA for ~3 seconds**
+
+**Deep Sleep Mode:**
+- ESP32-S3: ~10µA
+- Sensors automatically powered off via I2C disable
+- **Battery life: weeks to months**
+
+---
+
+## 📝 Checklist Before Powering On
+
+- [ ] All sensors connected via I2C (SDA→GPIO4, SCL→GPIO5)
+- [ ] All sensors powered with **3.3V**
+- [ ] Common GND connection
+- [ ] `REAL_SENSORS_ENABLED` = `true` in constants.h
+- [ ] Libraries installed via PlatformIO
+- [ ] Serial Monitor open for debugging
+
+---
+
+## 🎯 Next Steps
+
+1. **Install Libraries:** PlatformIO will auto-install on first build
+2. **Individual Test:** Verify each sensor I2C address with scanner
+3. **Integration:** Test all sensors together
+4. **Deploy:** Set REAL_SENSORS_ENABLED=true and upload
+
+**Happy sensing! 🎉**

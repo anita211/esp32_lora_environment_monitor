@@ -13,7 +13,7 @@ void process_rx_lora_message(
     float snr
 ) {
     LoRaRadio& radio = LoRaRadio::get_instance();
-    LoRaRadio::Stats stats = radio.get_stats();
+    LoRaRadio::Stats& stats = radio.get_stats();  // Use reference to modify original
 
     if (length < 1) {
         stats.total_rx_invalids++;

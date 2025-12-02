@@ -11,10 +11,10 @@
 #define SERIAL_BAUD_RATE        115200      // Serial port baud rate
 
 #define WIFI_ON
-#define WIFI_SSID               "VIVOFIBRA-5F31"
-#define WIFI_PASSWORD           "FbkfjWiv5A"
+#define WIFI_SSID               "AndroidAP7827"
+#define WIFI_PASSWORD           "senhai123"
 #define WIFI_TIMEOUT_MS         10000
-#define SERVER_HOST             "192.168.15.7"
+#define SERVER_HOST             "10.41.90.35"
 #define SERVER_PORT             8080
 #define SERVER_ENDPOINT_DATA    "/api/sensor-data"
 #define SERVER_ENDPOINT_STATS   "/api/gateway-stats"
@@ -60,11 +60,11 @@
 #define TX_INTERVAL_MS          30000       // Time between transmissions (milliseconds)
 #define TX_MAX_RETRIES          3           // Max retry attempts on TX failure
 
-#define ADAPTIVE_TX_ENABLED     false       // Enable/disable adaptive transmission
+#define ADAPTIVE_TX_ENABLED     true       // Enable/disable adaptive transmission
 #define HUMIDITY_CHANGE_THRESHOLD   2.0     // Min humidity change (%) to trigger TX
 #define DISTANCE_CHANGE_THRESHOLD   10.0    // Min distance change (cm) to trigger TX
 
-#define DEEP_SLEEP_ENABLED      true        // Use deep sleep between transmissions
+#define DEEP_SLEEP_ENABLED      true       // Use deep sleep between transmissions (DISABLED for USB CDC debug)
 #define DEEP_SLEEP_TIME_US      (TX_INTERVAL_MS * 1000ULL)  // Sleep duration in microseconds
 
 #define REAL_SENSORS_ENABLED    false       // true = real hardware, false = simulation

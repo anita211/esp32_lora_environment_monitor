@@ -33,7 +33,7 @@
 #define LORA_PREAMBLE_LENGTH    8           // Preamble symbols
 #define LORA_MAX_PACKET_SIZE    256         // Maximum LoRa packet size
 
-#define BATCH_ON
+// #define BATCH_ON
 #define BATCH_SIZE              5
 #define BATCH_TIMEOUT_MS        30000
 

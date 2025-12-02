@@ -19,6 +19,7 @@ HOST = '0.0.0.0'
 PORT = 8080
 
 gateway_stats_cache: Dict[int, Dict[str, Any]] = {}
+server_start_time: datetime = None  # Tempo de início do servidor
 
 
 def initialize_database() -> None:
@@ -85,7 +86,16 @@ def save_sensor_data(data: Dict[str, Any]) -> None:
     cursor = connection.cursor()
     
     node_id = data.get('node_id', 'unknown')
-    timestamp = data.get('timestamp', datetime.utcnow().isoformat())
+    
+    # Converter timestamp da ESP (milissegundos desde conexão) para timestamp absoluto
+    esp_timestamp_ms = data.get('timestamp')
+    if esp_timestamp_ms and isinstance(esp_timestamp_ms, (int, float)):
+        # Somar os milissegundos da ESP ao tempo de início do servidor
+        absolute_time = server_start_time + timedelta(milliseconds=esp_timestamp_ms)
+        timestamp = absolute_time.isoformat()
+    else:
+        # Fallback para timestamp atual se não houver timestamp da ESP
+        timestamp = datetime.utcnow().isoformat()
     
     sensors = data.get('sensors', data)
     radio = data.get('radio', {})
@@ -546,6 +556,9 @@ class SensorServerHandler(http.server.SimpleHTTPRequestHandler):
 
 def start_server() -> None:
     """Start the HTTP server"""
+    global server_start_time
+    server_start_time = datetime.utcnow()  # Registrar tempo de início do servidor
+    
     initialize_database()
     
     with socketserver.TCPServer((HOST, PORT), SensorServerHandler) as httpd:
