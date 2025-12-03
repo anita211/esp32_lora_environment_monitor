@@ -228,6 +228,18 @@ tbody tr:hover td {
   color: var(--accent);
 }
 
+/* Presence */
+.presence-detected {
+  color: var(--danger);
+  font-weight: 700;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
 /* === Alerts === */
 .alert-item {
   display: flex;
