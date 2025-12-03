@@ -24,7 +24,9 @@
         </div>
         <div class="stat-card">
           <span class="stat-label">Status</span>
-          <span class="stat-value status-dot" id="connection-status">● Connecting...</span>
+          <span class="stat-value status-dot" id="connection-status"
+            >● Connecting...</span
+          >
         </div>
       </div>
 
@@ -48,7 +50,9 @@
             </thead>
             <tbody id="table-body">
               <tr>
-                <td colspan="10" class="center mono">Waiting for sensor data...</td>
+                <td colspan="10" class="center mono">
+                  Waiting for sensor data...
+                </td>
               </tr>
             </tbody>
           </table>
@@ -66,6 +70,7 @@
     <script>
       const DATA_ENDPOINT = "/data";
       const ALERTS_ENDPOINT = "/api/alerts";
+      const STATS_ENDPOINT = "/api/stats";
       const POLL_INTERVAL = 5000;
 
       // Classificação de umidade do solo
@@ -141,17 +146,27 @@
         }
       }
 
+      async function fetchStats() {
+        try {
+          const res = await fetch(STATS_ENDPOINT);
+          if (!res.ok) return;
+          const stats = await res.json();
+          document.getElementById("active-nodes").textContent =
+            stats.active_nodes || 0;
+        } catch (err) {
+          console.error("Stats fetch error:", err);
+        }
+      }
+
       function renderTable(list) {
         const body = document.getElementById("table-body");
-        const activeNodesEl = document.getElementById("active-nodes");
 
         if (!Array.isArray(list) || list.length === 0) {
           body.innerHTML = `<tr><td colspan="10" class="center mono">No data received yet...</td></tr>`;
-          activeNodesEl.textContent = "0";
           return;
         }
 
-        activeNodesEl.textContent = list.length;
+        // Active nodes count is now fetched from /api/stats
         body.innerHTML = "";
 
         list.forEach((entry) => {
@@ -164,55 +179,55 @@
 
           // Temperature
           const tempVal = s.temperature_celsius ?? s.temperature;
-          const tempDisplay = typeof tempVal === "number"
-            ? tempVal.toFixed(1) + " °C"
-            : "N/A";
+          const tempDisplay =
+            typeof tempVal === "number" ? tempVal.toFixed(1) + " °C" : "N/A";
           const tempClass = classifyTemperature(tempVal);
 
           // Soil moisture (humidity)
           const moistureVal = s.humidity_percent ?? s.humidity;
-          const moistureDisplay = typeof moistureVal === "number"
-            ? moistureVal.toFixed(1) + " %"
-            : "N/A";
+          const moistureDisplay =
+            typeof moistureVal === "number"
+              ? moistureVal.toFixed(1) + " %"
+              : "N/A";
           const moistureClass = classifyMoisture(moistureVal);
 
           // Luminosity
           const luxVal = s.luminosity_lux ?? s.luminosity;
-          const luxDisplay = typeof luxVal === "number"
-            ? luxVal + " lux"
-            : "N/A";
+          const luxDisplay =
+            typeof luxVal === "number" ? luxVal + " lux" : "N/A";
           const luxClass = classifyLuminosity(luxVal);
 
           // Distance (ultrasonic)
           const distVal = s.distance_cm;
-          const distDisplay = typeof distVal === "number"
-            ? distVal + " cm"
-            : "N/A";
+          const distDisplay =
+            typeof distVal === "number" ? distVal + " cm" : "N/A";
 
           // Presence
           const presenceVal = s.presence_detected;
-          const presenceDisplay = presenceVal === true ? "✅ Yes" : presenceVal === false ? "❌ No" : "N/A";
+          const presenceDisplay =
+            presenceVal === true
+              ? "✅ Yes"
+              : presenceVal === false
+              ? "❌ No"
+              : "N/A";
           const presenceClass = presenceVal === true ? "presence-detected" : "";
 
           // Battery
           const battVal = entry.battery_percent ?? s.battery;
-          const battDisplay = typeof battVal === "number"
-            ? battVal + " %"
-            : "N/A";
+          const battDisplay =
+            typeof battVal === "number" ? battVal + " %" : "N/A";
           const battClass = classifyBattery(battVal);
 
           // RSSI
           const rssiVal = radio.rssi_dbm ?? s.rssi_dbm;
-          const rssiDisplay = typeof rssiVal === "number"
-            ? rssiVal + " dBm"
-            : "N/A";
+          const rssiDisplay =
+            typeof rssiVal === "number" ? rssiVal + " dBm" : "N/A";
           const rssiClass = classifyRSSI(rssiVal);
 
           // SNR
           const snrVal = radio.snr_db ?? s.snr_db;
-          const snrDisplay = typeof snrVal === "number"
-            ? snrVal.toFixed(1) + " dB"
-            : "N/A";
+          const snrDisplay =
+            typeof snrVal === "number" ? snrVal.toFixed(1) + " dB" : "N/A";
 
           const tr = document.createElement("tr");
           tr.innerHTML = `
@@ -238,20 +253,29 @@
           return;
         }
 
-        container.innerHTML = alerts.slice(0, 5).map(alert => `
-          <div class="alert-item ${alert.acknowledged ? 'alert-ack' : ''}">
-            <span class="alert-time">${new Date(alert.timestamp).toLocaleString("en-US")}</span>
-            <span class="alert-node">Node ${alert.node_id || '?'}</span>
+        container.innerHTML = alerts
+          .slice(0, 5)
+          .map(
+            (alert) => `
+          <div class="alert-item ${alert.acknowledged ? "alert-ack" : ""}">
+            <span class="alert-time">${new Date(alert.timestamp).toLocaleString(
+              "en-US",
+            )}</span>
+            <span class="alert-node">Node ${alert.node_id || "?"}</span>
             <span class="alert-msg">${alert.message}</span>
           </div>
-        `).join('');
+        `,
+          )
+          .join("");
       }
 
       document.addEventListener("DOMContentLoaded", () => {
         fetchAndRender();
         fetchAlerts();
+        fetchStats();
         setInterval(fetchAndRender, POLL_INTERVAL);
         setInterval(fetchAlerts, POLL_INTERVAL * 2);
+        setInterval(fetchStats, POLL_INTERVAL * 2);
       });
     </script>
   </body>

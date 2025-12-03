@@ -313,6 +313,16 @@ def fetch_gateway_stats_history(gateway_id: int = 1, limit: int = 100) -> List[D
     } for row in rows]
 
 
+def fetch_active_nodes_count() -> int:
+    """Count unique node IDs in the database"""
+    connection = sqlite3.connect(DB_PATH)
+    cursor = connection.cursor()
+    cursor.execute('SELECT COUNT(DISTINCT node_id) FROM sensor_data')
+    count = cursor.fetchone()[0]
+    connection.close()
+    return count
+
+
 class SensorServerHandler(http.server.SimpleHTTPRequestHandler):
     """HTTP request handler for sensor data"""
     
@@ -516,6 +526,19 @@ class SensorServerHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
                 self.wfile.write(json.dumps(history).encode())
+            except Exception as e:
+                self.send_response(500, 'Internal Server Error')
+                self.end_headers()
+                self.wfile.write(f'Server error: {e}'.encode())
+        
+        elif self.path == '/api/stats':
+            try:
+                active_nodes = fetch_active_nodes_count()
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps({'active_nodes': active_nodes}).encode())
             except Exception as e:
                 self.send_response(500, 'Internal Server Error')
                 self.end_headers()
