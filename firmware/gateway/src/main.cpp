@@ -23,7 +23,12 @@ static void generate_fake_packet();
 static void print_statistics();
 
 void setup() {
-    print_log("Node %d - Setting up...\n", NODE_ID);
+    Serial.begin(SERIAL_BAUD_RATE);
+    delay(500);  // Aguarda estabilização do Serial
+    
+    print_log("\n========================================\n");
+    print_log("Gateway Node %d - Setting up...\n", NODE_ID);
+    print_log("========================================\n");
 
     energy.start_time = millis();
     energy.last_calc_time = millis();

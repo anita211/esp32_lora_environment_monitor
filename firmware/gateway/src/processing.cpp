@@ -197,12 +197,19 @@ void handle_sensor_data(SensorDataMessage* msg, float rssi, float snr) {
     String json = build_sensor_json(msg, rssi, snr);
 
 #ifdef WIFI_ON
+    print_log("WiFi status: %s\n", wifi_connected ? "connected" : "disconnected");
     if (wifi_connected) {
 #ifdef BATCH_ON
+        print_log("Adding to batch...\n");
         add_to_batch(json);
 #else
+        print_log("Forwarding to server...\n");
         forward_to_server(json.c_str());
 #endif
+    } else {
+        print_log("Skipping server forward - WiFi not connected\n");
     }
+#else
+    print_log("WiFi is disabled (WIFI_ON not defined)\n");
 #endif
 }

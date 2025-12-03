@@ -29,11 +29,13 @@ void init_wifi() {
     uint32_t start = millis();
     while (WiFi.status() != WL_CONNECTED && (millis() - start) < WIFI_TIMEOUT_MS) {
         delay(500);
+        print_log(".");
     }
+    print_log("\n");
 
     if (WiFi.status() == WL_CONNECTED) {
         wifi_connected = true;
-        print_log("Connected - IP: %s\n", WiFi.localIP().toString().c_str());
+        print_log("WiFi connected - IP: %s\n", WiFi.localIP().toString().c_str());
 
         configTime(-3 * 3600, 0, "pool.ntp.org");  // UTC-3 (Brazil)
         int retry = 0;
@@ -42,25 +44,35 @@ void init_wifi() {
             retry++;
         }
         time_synced = (time(nullptr) > 100000);
-        print_log("Synchronization of time: %s\n", time_synced ? "OK" : "FAILED");
+        print_log("Time sync: %s\n", time_synced ? "OK" : "FAILED");
     } else {
         wifi_connected = false;
-        print_log("Couldn't connect to WiFi\n");
+        print_log("WiFi connection FAILED (status: %d)\n", WiFi.status());
     }
+    
+    print_log("wifi_connected = %s\n", wifi_connected ? "true" : "false");
+#else
+    print_log("WiFi is disabled (WIFI_ON not defined)\n");
 #endif
 }
 
 void forward_to_server(const char* json_data) {
 #ifdef WIFI_ON
-    if (!wifi_connected) return;
+    if (!wifi_connected) {
+        print_log("forward_to_server: WiFi not connected, skipping\n");
+        return;
+    }
 
     HTTPClient http;
     String url = String("http://") + SERVER_HOST + ":" + SERVER_PORT + SERVER_ENDPOINT_DATA;
+    
+    print_log("Sending to: %s\n", url.c_str());
 
     uint32_t start_time = millis();
 
     http.begin(url);
     http.addHeader("Content-Type", "application/json");
+    http.setTimeout(5000);  // Timeout de 5 segundos
     int http_code = http.POST(json_data);
 
     latency.last_ms = millis() - start_time;
@@ -74,17 +86,19 @@ void forward_to_server(const char* json_data) {
 
         if (http_code == HTTP_CODE_OK || http_code == HTTP_CODE_CREATED) {
             server_stats.success++;
-            print_log("Foward to server success: %u ms\n", latency.last_ms);
+            print_log("Forward to server success: %u ms (code: %d)\n", latency.last_ms, http_code);
         } else {
             server_stats.failed++;
-            print_log("Error response code: %d\n", http_code);
+            print_log("Server response error code: %d\n", http_code);
         }
     } else {
         server_stats.failed++;
-        print_log("Forwarding to server failed: %s\n", http.errorToString(http_code).c_str());
+        print_log("HTTP request failed: %s (code: %d)\n", http.errorToString(http_code).c_str(), http_code);
     }
 
     http.end();
+#else
+    print_log("forward_to_server: WIFI_ON not defined\n");
 #endif
 }
 
