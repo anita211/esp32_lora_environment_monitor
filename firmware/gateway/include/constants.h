@@ -24,6 +24,11 @@
 #define LORA_PIN_IRQ            39          // LoRa interrupt (IRQ)
 #define LORA_PIN_GPIO_INT       40          // LoRa busy signal
 
+// SPI pins for LoRa module
+#define LORA_PIN_SCK            7           // SPI Clock
+#define LORA_PIN_MISO           8           // SPI MISO
+#define LORA_PIN_MOSI           9           // SPI MOSI
+
 #define LORA_FREQUENCY_MHZ      915.0       // RF frequency: 915 (Americas), 868 (EU), 433 (Asia)
 #define LORA_BANDWIDTH_KHZ      125.0       // Bandwidth: 125, 250, or 500 kHz
 #define LORA_SPREADING_FACTOR   9           // Spreading factor: 7-12
@@ -38,5 +43,9 @@
 #define BATCH_TIMEOUT_MS        30000
 
 #define MAX_DISTANCE_TO_BE_PRESENCE_CM 100         // Distance threshold for presence detection
+
+// Duplicate detection
+#define MAX_CLIENTS             8           // Maximum number of clients to track for duplicate detection
+#define DUPLICATE_WINDOW_MS     5000        // Time window to consider a packet as duplicate (ms)
 
 #endif // CONSTANTS_H

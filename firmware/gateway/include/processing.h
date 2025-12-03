@@ -10,7 +10,7 @@ void process_rx_lora_message(
   float rssi,
   float snr
 );
-static String build_sensor_json(SensorDataMessage* msg, float rssi, float snr);
 void handle_sensor_data(SensorDataMessage* msg, float rssi, float snr);
+uint32_t get_duplicate_count();
 
 #endif // PROCESSING_H

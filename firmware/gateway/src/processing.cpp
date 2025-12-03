@@ -3,8 +3,57 @@
 #include "wifi.h"
 #include "utils.h"
 #include "batch.h"
+#include "constants.h"
 #include <ArduinoJson.h>
 
+// Estrutura para rastreamento de pacotes duplicados
+struct LastPacket {
+    uint8_t client_id;
+    uint32_t timestamp;
+    uint32_t rx_time;
+};
+static LastPacket last_packets[MAX_CLIENTS] = {0};
+static uint32_t rx_duplicate_count = 0;
+
+// Verifica se um pacote é duplicado baseado no client_id e timestamp
+static bool is_duplicate(uint8_t client_id, uint32_t timestamp) {
+    uint32_t now = millis();
+    
+    // Procura pelo cliente na lista
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        if (last_packets[i].client_id == client_id) {
+            // Se o timestamp é igual e está dentro da janela de tempo, é duplicado
+            if (last_packets[i].timestamp == timestamp &&
+                (now - last_packets[i].rx_time) < DUPLICATE_WINDOW_MS) {
+                return true;
+            }
+            // Atualiza o registro para este cliente
+            last_packets[i].timestamp = timestamp;
+            last_packets[i].rx_time = now;
+            return false;
+        }
+    }
+    
+    // Cliente não encontrado, procura slot vazio
+    for (int i = 0; i < MAX_CLIENTS; i++) {
+        if (last_packets[i].client_id == 0) {
+            last_packets[i].client_id = client_id;
+            last_packets[i].timestamp = timestamp;
+            last_packets[i].rx_time = now;
+            return false;
+        }
+    }
+    
+    // Sem slot vazio, substitui o primeiro
+    last_packets[0].client_id = client_id;
+    last_packets[0].timestamp = timestamp;
+    last_packets[0].rx_time = now;
+    return false;
+}
+
+uint32_t get_duplicate_count() {
+    return rx_duplicate_count;
+}
 
 void process_rx_lora_message(
     uint8_t* data,
@@ -25,13 +74,16 @@ void process_rx_lora_message(
     switch (msg_type) {
     case MSG_TYPE_SENSOR_DATA:
         if (length == sizeof(SensorDataMessage)) {
+            SensorDataMessage* sensor_msg = reinterpret_cast<SensorDataMessage*>(data);
             if (verify_checksum(data, length)) {
-                handle_sensor_data(
-                  reinterpret_cast<SensorDataMessage*>(data),
-                  rssi,
-                  snr
-                );
-                stats.total_rx_valids++;
+                // Verifica se é um pacote duplicado
+                if (is_duplicate(sensor_msg->client_id, sensor_msg->timestamp)) {
+                    rx_duplicate_count++;
+                    print_log("Lora packet RX duplicate - packet ignored (client=%d)\n", sensor_msg->client_id);
+                } else {
+                    handle_sensor_data(sensor_msg, rssi, snr);
+                    stats.total_rx_valids++;
+                }
             } else {
                 print_log("Lora packet RX checksum error - packet discarded\n");
                 stats.total_checksum_errors++;

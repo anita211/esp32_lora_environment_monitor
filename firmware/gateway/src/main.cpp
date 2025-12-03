@@ -77,8 +77,8 @@ static void print_statistics() {
 
     print_log("\n\nStatistics of gateway:\n");
     print_log("Uptime: %02u:%02u:%02u\n", uptime_s / 3600, (uptime_s % 3600) / 60, uptime_s % 60);
-    print_log("LoRa RX - Valid: %u | Invalid: %u | Loss: %.1f%%\n",
-          lora_stats.total_rx_valids, lora_stats.total_rx_invalids, packet_loss);
+    print_log("LoRa RX - Valid: %u | Invalid: %u | Duplicates: %u | Loss: %.1f%%\n",
+          lora_stats.total_rx_valids, lora_stats.total_rx_invalids, get_duplicate_count(), packet_loss);
     print_log("Server TX - Success: %u/%u | Rate: %.1f%%\n",
           server_stats.success, server_stats.total, server_success);
     if (latency.samples > 0) {
